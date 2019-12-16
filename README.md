@@ -381,9 +381,9 @@ This returns you the sort string used in the *select many*. If you inherit this 
 
 Please check those test files:
 
-- DBI: [dbi_test.go](https://github.com/genelet/taodbi/blob/master/src/dbi_test.go)
-- Crud: [crud_test.go](https://github.com/genelet/taodbi/blob/master/src/crud_test.go)
-- Model: [model_test.go](https://github.com/genelet/taodbi/blob/master/src/model_test.go)
+- DBI: [dbi_test.go](https://github.com/genelet/taodbi/blob/master/dbi_test.go)
+- Crud: [crud_test.go](https://github.com/genelet/taodbi/blob/master/crud_test.go)
+- Model: [model_test.go](https://github.com/genelet/taodbi/blob/master/model_test.go)
 
 
 
