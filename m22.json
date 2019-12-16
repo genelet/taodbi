@@ -1,0 +1,16 @@
+{
+	"crud": {
+    	"current_table": "atesting",
+    	"current_key" : "id"
+	},
+    "insupd_pars" : ["x","y"],
+    "insert_pars" : ["x","y","z"],
+    "edit_pars" : ["x","y","z","id"],
+    "topics_pars" : ["id","x","y","z"],
+
+	"nextpages" : {
+        "topics" : [
+            {"model":"testing", "action":"topics"}
+        ]
+    }
+}
