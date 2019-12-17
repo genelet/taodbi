@@ -1,7 +1,6 @@
 package taodbi
 
 import (
-	//"log"
 	"database/sql"
 	"strings"
 )
@@ -19,6 +18,7 @@ type Crud struct {
 	LastID       int64                  `json:"last_id,omitempty"`
 	CurrentRow   map[string]interface{} `json:"last_row,omitempty"`
 	Updated      bool                   `json:"updated,omitempty"`
+	UsingTags    string                 `json:"using_tags,omitempty"`
 }
 
 func hasValue(extra ...map[string]interface{}) bool {
@@ -138,7 +138,7 @@ func (self *Crud) InsertHash(field_values map[string]interface{}) error {
 	values := make([]interface{}, 0)
 	found := false
 	for k, v := range field_values {
-		if k == self.CurrentKey {
+		if k == self.CurrentKey && v != nil {
 			found = true
 		}
 		if v == nil {
@@ -147,7 +147,7 @@ func (self *Crud) InsertHash(field_values map[string]interface{}) error {
 		fields = append(fields, k)
 		values = append(values, v)
 	}
-	sql := "INSERT INTO " + self.CurrentTable + " ("
+	sql := "INSERT INTO " + self.CurrentTable + " " + self.UsingTags + " ("
 	if found == false {
 		sql += self.CurrentKey + ", "
 	}
