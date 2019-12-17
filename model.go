@@ -147,6 +147,29 @@ func (self *Model) Edit(extra ...map[string]interface{}) error {
 	return self.ProcessAfter("edit", extra...)
 }
 
+// EditFK selects ony one using 'foreign key' value in ARGS,
+// optionally with restrictions defined in 'extra'.
+func (self *Model) EditFK(extra ...map[string]interface{}) error {
+	id := self.ForeignKey
+	val := self.ARGS[id]
+	if hasValue(extra...) {
+		val = self.ProperValue(id, extra[0])
+	}
+	if val == nil {
+		return errors.New("Foreign key has no value")
+	}
+
+	fields := self.filteredFields(self.EditMap, self.EditPars)
+
+	self.LISTS = make([]map[string]interface{}, 0)
+	err := self.EditHashFK(&self.LISTS, fields, val, extra...)
+	if err != nil {
+		return err
+	}
+
+	return self.ProcessAfter("editfk", extra...)
+}
+
 func index(vs []string, t string) int {
 	for i, v := range vs {
 		if v == t {

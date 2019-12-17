@@ -9,25 +9,30 @@ import (
 
 func TestCrudStr(t *testing.T) {
 	select_par := "firstname"
-	sql, labels := selectType(select_par)
-	if sql != "firstname" {
+	sql, labels, types := selectType(select_par)
+	if sql != "firstname" || labels[0] != "firstname" {
 		t.Errorf("%s wanted", sql)
 	}
-	if labels != nil {
-		t.Errorf("nil wanted but %#v", labels)
+	if types != nil {
+		t.Errorf("nil wanted but %#v", types)
 	}
 
 	select_pars := []string{"firstname", "lastname", "id"}
-	sql, labels = selectType(select_pars)
-	if sql != "firstname, lastname, id" {
+	sql, labels, types = selectType(select_pars)
+	if sql != "firstname, lastname, id" &&
+		sql != "firstname, id, lastname" &&
+		sql != "id, firstname, lastname" &&
+		sql != "id, lastname, firstname" &&
+		sql != "lastname, id, firstname" &&
+		sql != "lastname, firstname, id" {
 		t.Errorf("%s wanted", sql)
 	}
-	if labels != nil {
-		t.Errorf("nil wanted but %#v", labels)
+	if types != nil {
+		t.Errorf("nil wanted but %#v", types)
 	}
 
 	select_hash := map[string]string{"firstname": "string", "lastname": "string", "id": "int64"}
-	sql, labels = selectType(select_hash)
+	sql, labels, types = selectType(select_hash)
 	if sql != "id, firstname, lastname" &&
 		sql != "id, lastnaem, firstname" &&
 		sql != "firstname, lastname, id" &&
@@ -35,11 +40,6 @@ func TestCrudStr(t *testing.T) {
 		sql != "lastname, firstname, id" &&
 		sql != "lastname, id, firstname" {
 		t.Errorf("%s wanted", sql)
-	}
-	if !(sql == "id, firstname, lastname" && labels[0] == "int64") &&
-		!(sql == "firstname, lastname, id" && labels[0] == "string") &&
-		!(sql == "lastname, firstname, id" && labels[0] == "string") {
-		t.Errorf("%s wanted", labels[0])
 	}
 
 	extra := map[string]interface{}{"firstname": "Peter"}

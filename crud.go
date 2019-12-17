@@ -15,25 +15,35 @@ type Crud struct {
 	DBI          `json:"dbi,omitempty"`
 	CurrentTable string                 `json:"current_table"`
 	CurrentKey   string                 `json:"current_key"`
+	ForeignKey   string                 `json:"foreign_key"`
 	LastID       int64                  `json:"last_id,omitempty"`
 	CurrentRow   map[string]interface{} `json:"last_row,omitempty"`
 	Updated      bool                   `json:"updated,omitempty"`
 	UsingTags    string                 `json:"using_tags,omitempty"`
 }
 
+/*
+func HasValue(extra ...map[string]interface{}) bool {
+	return hasValue(extra...)
+}
+func SelectCondition(extra map[string]interface{}) (string, []interface{}) {
+	return selectCondition(extra)
+}
+*/
+
 func hasValue(extra ...map[string]interface{}) bool {
 	return extra != nil && len(extra) > 0
 
 }
 
-func selectType(select_pars interface{}) (string, []string) {
+func selectType(select_pars interface{}) (string, []string, []string) {
 	switch select_pars.(type) {
 	case []string:
 		labels := make([]string, 0)
 		for _, v := range select_pars.([]string) {
 			labels = append(labels, v)
 		}
-		return strings.Join(labels, ", "), nil
+		return strings.Join(labels, ", "), labels, nil
 	case map[string]string:
 		labels := make([]string, 0)
 		types := make([]string, 0)
@@ -41,10 +51,10 @@ func selectType(select_pars interface{}) (string, []string) {
 			labels = append(labels, key)
 			types = append(types, val)
 		}
-		return strings.Join(labels, ", "), types
+		return strings.Join(labels, ", "), labels, types
 	default:
 	}
-	return select_pars.(string), nil
+	return select_pars.(string), []string{select_pars.(string)}, nil
 }
 
 func selectCondition(extra map[string]interface{}) (string, []interface{}) {
@@ -196,14 +206,28 @@ func (self *Crud) InsupdHash(field_values map[string]interface{}, uniques []stri
 // Only will columns defined in select_pars will be returned.
 // The select restriction is described in extra. See 'extra' in TopicsHash.
 func (self *Crud) EditHash(lists *[]map[string]interface{}, select_pars interface{}, ids interface{}, extra ...map[string]interface{}) error {
-	sql, types := selectType(select_pars)
-	sql = "SELECT " + sql + "\nFROM " + self.CurrentTable
-	where, extra_values := singleCondition(self.CurrentKey, ids, extra...)
+    sql, labels, types := selectType(select_pars)
+    sql = "SELECT " + sql + "\nFROM " + self.CurrentTable
+    where, extra_values := singleCondition(self.CurrentKey, ids, extra...)
+    if where != "" {
+        sql += "\nWHERE " + where
+    }
+
+    return self.QuerySQLTypeLabel(lists, types, labels, sql, extra_values...)
+}
+
+// EditFK selects rows using one row with 'Foreign Key' value 'ids'.
+// Only will columns defined in select_pars will be returned.
+// The select restriction is described in extra. See 'extra' in TopicsHash.
+func (self *Crud) EditHashFK(lists *[]map[string]interface{}, select_pars interface{}, ids interface{}, extra ...map[string]interface{}) error {
+	sql, labels, types := selectType(select_pars)
+	sql = "SELECT LAST(*) FROM " + self.CurrentTable
+	where, extra_values := singleCondition(self.ForeignKey, ids, extra...)
 	if where != "" {
 		sql += "\nWHERE " + where
 	}
 
-	return self.QuerySQLType(lists, types, sql, extra_values...)
+	return self.QuerySQLTypeLabel(lists, types, labels, sql, extra_values...)
 }
 
 // TopicsHash selects rows using restriction 'extra'.
@@ -218,7 +242,7 @@ func (self *Crud) TopicsHash(lists *[]map[string]interface{}, select_pars interf
 
 // TopicsHashOrder is the same as TopisHash, but use the order string as 'ORDER BY order'
 func (self *Crud) TopicsHashOrder(lists *[]map[string]interface{}, select_pars interface{}, order string, extra ...map[string]interface{}) error {
-	sql, types := selectType(select_pars)
+	sql, _, types := selectType(select_pars)
 	sql = "SELECT " + sql + "\nFROM " + self.CurrentTable
 
 	if hasValue(extra...) {

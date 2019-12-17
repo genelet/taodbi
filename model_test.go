@@ -1,4 +1,4 @@
-package taodbi;
+package taodbi
 
 import (
     "testing"
