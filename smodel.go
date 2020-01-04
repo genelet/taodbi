@@ -1,6 +1,7 @@
 package taodbi
 
 import (
+//"log"
 	"fmt"
 	"errors"
 	"encoding/json"
@@ -8,9 +9,6 @@ import (
 
 type Smodel struct {
 	Model
-
-	CurrentStable	string	`json:"current_stable"`
-	Tags		[]string	`json:"tags"`
 }
 
 // NewSmodel constructs a new Model object from the json model string
@@ -37,11 +35,11 @@ func NewSmodel(content []byte) (*Smodel, error) {
         parsed.TOTALNO = "totalno"
     }
 
-    return parsed, nil
+	return parsed, nil
 }
 
 func (self *Smodel) getSQL(extra ...map[string]interface{}) (string, []interface{}) {
-	str :=`SELECT LAST(*) FROM `+self.CurrentStable+` WHERE `+self.ForeignKey+`=?`
+	str := `SELECT LAST(*) FROM ` + self.CurrentTable + ` WHERE ` + self.ForeignKey + `=?`
 	values := []interface{}{self.ARGS[self.ForeignKey]}
 	if hasValue(extra...) {
         s, arr := selectCondition(extra[0])
@@ -53,20 +51,30 @@ func (self *Smodel) getSQL(extra ...map[string]interface{}) (string, []interface
 	return str, values
 }
 
-func (self *Smodel)Stopics(extra ...map[string]interface{}) error {
+// LastTopics reports items of a given foreign key in all tables under a super table.
+func (self *Smodel) LastTopics(extra ...map[string]interface{}) error {
+	if self.ForeignKey == "" { return errors.New("no foreign key") }
 	str, values := self.getSQL(extra...)
 	str += " GROUP BY "
 	for _, tag := range self.Tags {
-		str += "?,"
-		values = append(values, self.ARGS[tag])
+		str += tag + ","
 	}
 	str = str[:len(str)-1]
 
     self.LISTS = []map[string]interface{}{}
-	return self.SelectSQLLabel(&self.LISTS, append(self.TopicsPars, self.Tags...), str, values...)
+	return self.SelectSQLLabel(&self.LISTS, self.TopicsPars, str, values...)
 }
 
-func (self *Smodel)Sedit(extra ...map[string]interface{}) error {
+func indexString(vs []string, t string) int {
+    for i, v := range vs {
+        if v == t { return i }
+    }
+    return -1
+}
+
+// LastEdit reports one item of a given foreign key in super table.
+func (self *Smodel)LastEdit(extra ...map[string]interface{}) error {
+	if self.ForeignKey == "" { return errors.New("no foreign key") }
 	str, values := self.getSQL(extra...)
 	for _, tag := range self.Tags {
 		str += " AND " + tag + "=?"
@@ -74,54 +82,40 @@ func (self *Smodel)Sedit(extra ...map[string]interface{}) error {
 	}
 
     self.LISTS = []map[string]interface{}{}
-	return self.SelectSQLLabel(&self.LISTS, append(self.EditPars, self.Tags...), str, values...)
-}
-
-/*
-func (self *Smodel) InsertTag(extra ...map[string]interface{}) error {
-	var one map[string]interface{}
-	if extra != nil { one = extra[0] }
-	tag_value := self.ProperValue(self.TAGNAME, one)
-	type_value := self.ProperValue(self.TYPENAME, one)
-	if tag_value==nil || type_value==nil {
-		return errors.New("Missing tag or type")
+	labels := make([]string,0)
+	for _, label := range self.EditPars {
+		if indexString(self.Tags, label)<0 {
+			labels = append(labels, label)
+		}
 	}
-	return self.ExecSQL(
-`ALTER TABLE ` +self.CurrentStable+ ` ADD TAG ? ?`, tag_value, type_value)
+	return self.SelectSQLLabel(&self.LISTS, labels, str, values...)
 }
 
-func (self *Smodel) DeleteTag(extra ...map[string]interface{}) error {
-	var one map[string]interface{}
-	if extra != nil { one = extra[0] }
-	tag_value := self.ProperValue(self.TAGNAME, one)
-	if tag_value==nil {
-		return errors.New("Missing tag")
-	}
-	return self.ExecSQL(
-`ALTER TABLE ` +self.CurrentStable+ ` DROP TAG ?`, tag_value)
-}
-*/
-
-func (self *Smodel)MakeTableUsing(extra ...map[string]interface{}) error {
+// CreateTable create a table using tags and current super table
+func (self *Smodel) CreateTable(extra ...map[string]interface{}) error {
 	var one map[string]interface{}
 	if extra != nil { one = extra[0] }
 	values := self.ProperValues(self.Tags, one)
-	table :=  self.CurrentStable
-	using := "USING "+self.CurrentStable+" TAGS ("
+	table :=  self.CurrentTable
+	using := "USING "+self.CurrentTable+" TAGS ("
 	for i, v := range values {
 		if v==nil { return errors.New("Missing " + self.Tags[i]) }
 		table += fmt.Sprintf("_%v", v)
 		using += fmt.Sprintf("%v,", Quote(v))
 	}
 	using = using[:len(using)-1] + ")"
-	self.CurrentTable = table
-	self.UsingTags = using
-	return nil
+	return self.ExecSQL("CREATE TABLE IF NOT EXISTS " + table + " " + using)
 }
 
-func (self *Smodel) CreateTable(extra ...map[string]interface{}) error {
-	if err := self.MakeTableUsing(extra...); err != nil {
-		return err
+// DropTable drops a table using tags and current super table
+func (self *Smodel) DropTable(extra ...map[string]interface{}) error {
+	var one map[string]interface{}
+	if extra != nil { one = extra[0] }
+	values := self.ProperValues(self.Tags, one)
+	table :=  self.CurrentTable
+	for i, v := range values {
+		if v==nil { return errors.New("Missing " + self.Tags[i]) }
+		table += fmt.Sprintf("_%v", v)
 	}
-	return self.ExecSQL("CREATE TABLE IF NOT EXISTS " + self.CurrentTable + " " + self.UsingTags)
+	return self.ExecSQL("DROP TABLE IF EXISTS " + table)
 }

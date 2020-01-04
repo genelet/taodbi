@@ -1,11 +1,12 @@
 {
 	"crud": {
-    	"current_key" : "id"
+    	"current_key" : "id",
+    	"current_table": "stesting",
+		"foreign_key": "x",
+		"tags": ["pubid", "location"]
 	},
-    "current_stable": "stesting",
-	"tags": ["pubid", "location"],
-    "insupd_pars" : ["x","y"],
-    "insert_pars" : ["x","y","z"],
-    "edit_pars" : ["x","y","z","id"],
-    "topics_pars" : ["id","x","y","z"]
+    "insupd_pars" : [     "x","y"],
+    "insert_pars" : [     "x","y","z", "pubid", "location"],
+    "edit_pars"   : ["id","x","y","z", "pubid", "location"],
+    "topics_pars" : ["id","x","y","z", "pubid", "location"]
 }

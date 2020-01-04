@@ -1,8 +1,11 @@
 package taodbi
 
 import (
+//"log"
 	"database/sql"
 	"strings"
+	"fmt"
+	"errors"
 )
 
 // Crud works on table's insert and select using map.
@@ -16,20 +19,11 @@ type Crud struct {
 	CurrentTable string                 `json:"current_table"`
 	CurrentKey   string                 `json:"current_key"`
 	ForeignKey   string                 `json:"foreign_key"`
+	Tags         []string				`json:"tags"`
 	LastID       int64                  `json:"last_id,omitempty"`
 	CurrentRow   map[string]interface{} `json:"last_row,omitempty"`
 	Updated      bool                   `json:"updated,omitempty"`
-	UsingTags    string                 `json:"using_tags,omitempty"`
 }
-
-/*
-func HasValue(extra ...map[string]interface{}) bool {
-	return hasValue(extra...)
-}
-func SelectCondition(extra map[string]interface{}) (string, []interface{}) {
-	return selectCondition(extra)
-}
-*/
 
 func hasValue(extra ...map[string]interface{}) bool {
 	return extra != nil && len(extra) > 0
@@ -144,6 +138,22 @@ func (self *Crud) InsertLast(field_values map[string]interface{}) error {
 // InsertHash inserts a row as map (hash) into the table. If the value of CurrenyKey
 // is not given, it will be assigned as the current timestamp. 
 func (self *Crud) InsertHash(field_values map[string]interface{}) error {
+	sql := "INSERT INTO "
+	if self.Tags != nil {
+		table := ""
+		using := ""
+		for _, t := range self.Tags {
+			v := field_values[t]
+			if v==nil { return errors.New("Missing " + t) }
+			table += fmt.Sprintf("_%v", v)
+			using += fmt.Sprintf("%v,", Quote(v))
+			delete(field_values, t)
+		}
+		sql += self.CurrentTable + table + " USING " + self.CurrentTable + " TAGS (" + using[:len(using)-1] + ") "
+	} else {
+		sql += self.CurrentTable
+	}
+
 	fields := make([]string, 0)
 	values := make([]interface{}, 0)
 	found := false
@@ -157,7 +167,8 @@ func (self *Crud) InsertHash(field_values map[string]interface{}) error {
 		fields = append(fields, k)
 		values = append(values, v)
 	}
-	sql := "INSERT INTO " + self.CurrentTable + " " + self.UsingTags + " ("
+
+	sql += "("
 	if found == false {
 		sql += self.CurrentKey + ", "
 	}

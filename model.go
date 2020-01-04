@@ -506,3 +506,7 @@ func (self *Model) ProperValuesHash(vs []string, extra map[string]interface{}) m
 	}
 	return hash
 }
+
+func (self *Model) HasValue() bool {
+	return self.LISTS != nil && len(self.LISTS) > 0
+}
