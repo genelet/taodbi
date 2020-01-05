@@ -27,7 +27,6 @@ type Crud struct {
 
 func hasValue(extra ...map[string]interface{}) bool {
 	return extra != nil && len(extra) > 0
-
 }
 
 func selectType(select_pars interface{}) (string, []string, []string) {

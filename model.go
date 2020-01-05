@@ -3,6 +3,7 @@ package taodbi
 import (
 	//"log"
 	"encoding/json"
+	"io/ioutil"
 	"errors"
 	"math"
 	"strconv"
@@ -74,31 +75,41 @@ type Model struct {
 	TotalForce int `json:"total_force,omitempty"`
 }
 
-// NewModel constructs a new Model object from the json model string
+// NewModel constructs a new Model object from json string
 func NewModel(content []byte) (*Model, error) {
 	parsed := new(Model)
-	err := json.Unmarshal(content, parsed)
-	if err != nil {
-		return nil, err
-	}
+	err := parsed._load(content)
+	return parsed, err
+}
 
-	if parsed.SORTBY == "" {
-		parsed.SORTBY = "sortby"
-	}
-	if parsed.SORTREVERSE == "" {
-		parsed.SORTREVERSE = "sortreverse"
-	}
-	if parsed.PAGENO == "" {
-		parsed.PAGENO = "pageno"
-	}
-	if parsed.ROWCOUNT == "" {
-		parsed.ROWCOUNT = "rowcount"
-	}
-	if parsed.TOTALNO == "" {
-		parsed.TOTALNO = "totalno"
-	}
+// Load specifies a new Model object by json file
+func (self *Model) Load(filename string) error {
+    content, err := ioutil.ReadFile(filename)
+	if err != nil { return err }
+	return self._load(content)
+}
 
-	return parsed, nil
+func (self *Model) _load(content []byte) error {
+    err := json.Unmarshal(content, self)
+    if err != nil { return err }
+
+    if self.SORTBY == "" {
+        self.SORTBY = "sortby"
+    }
+    if self.SORTREVERSE == "" {
+        self.SORTREVERSE = "sortreverse"
+    }
+    if self.PAGENO == "" {
+        self.PAGENO = "pageno"
+    }
+    if self.ROWCOUNT == "" {
+        self.ROWCOUNT = "rowcount"
+    }
+    if self.TOTALNO == "" {
+        self.TOTALNO = "totalno"
+    }
+
+    return nil
 }
 
 func (self *Model) filteredFields(in_hash map[string]string, in_pars []string) interface{} {
