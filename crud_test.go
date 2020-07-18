@@ -1,10 +1,10 @@
 package taodbi
 
 import (
-	"database/sql"
-	_ "taosSql"
 	"testing"
 	"time"
+	"database/sql"
+	_ "github.com/taosdata/driver-go/taosSql"
 )
 
 func TestCrudStr(t *testing.T) {

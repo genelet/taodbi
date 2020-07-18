@@ -1,11 +1,11 @@
 package taodbi
 
 import (
-	"database/sql"
-	"fmt"
-	_ "taosSql"
 	"testing"
+	"fmt"
 	"time"
+	"database/sql"
+	_ "github.com/taosdata/driver-go/taosSql"
 )
 
 func TestQuote(t *testing.T) {

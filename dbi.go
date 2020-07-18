@@ -1,9 +1,9 @@
 package taodbi
 
 import (
-	"database/sql"
 	"strings"
-	_ "taosSql"
+	"database/sql"
+    _ "github.com/taosdata/driver-go/taosSql"
 )
 
 // DBI is an abstract database interface to access TDEngine.

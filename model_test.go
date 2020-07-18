@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"math/rand"
     "database/sql"
-    _ "taosSql"
+    _ "github.com/taosdata/driver-go/taosSql"
 )
 
 func TestModel(t *testing.T) {

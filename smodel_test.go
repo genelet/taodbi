@@ -3,10 +3,8 @@ package taodbi
 import (
     "testing"
 	"time"
-//	"strconv"
-//	"math/rand"
     "database/sql"
-    _ "taosSql"
+    _ "github.com/taosdata/driver-go/taosSql"
 )
 
 func TestSmodel(t *testing.T) {
