@@ -14,6 +14,10 @@ type DBI struct {
 	Affected int64   `json:"affected,omitempty"`
 }
 
+func Open(ds string) (*sql.DB, error) {
+	return sql.Open("taosSql", ds)
+}
+
 // Quote escapes string to be used safely in placeholder.
 // The SQL functions in the package have already quoted so
 // you should not call this again in using them.

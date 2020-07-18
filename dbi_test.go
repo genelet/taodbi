@@ -43,7 +43,7 @@ func TestLong(t *testing.T) {
 	c := newconf("config.json")
 
 	dbname := "demodb"
-	db, err := sql.Open(c.Db_type, c.Dsn_1)
+	db, err := Open(c.Dsn_1)
 	if err != nil {
 		panic(err)
 	}
