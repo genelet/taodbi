@@ -5,6 +5,8 @@ An abstract interface class to access the big data system TDengine in GO. Check 
 
 [TDengine](https://github.com/taosdata/TDengine) is a very fast open-source database system. It comes with a [GO connector](https://github.com/taosdata/driver-go). This _taodbi_ GO package provides _abstract_ classes to access it, which some users may feel more convenient to use. In an advanced usage, one can call multiple *JOINed* tables in one statement, just like relational database.
 
+
+
 ### Installation
 
 ```
@@ -19,12 +21,14 @@ $ git clone https://github.com/genelet/taodbi.git
 There are three levels of usages: Basic, Map and Advanced.
 
 
+
+
 ## Chapter 1. BASIC USAGE
 
 
 ### 1.1) Data Type _DBI_
 
-The struct _DBI_ provides wrapped functions on top of the standard _database/sql_ handle.
+The struct _DBI_ is a wrapper of the standard _database/sql_ handle.
 ```
 package taodbi
 
@@ -42,10 +46,11 @@ Use this function:
 ```
 func Open(dataSourceName string) (*DB, error)
 ```
+
 So you get a _DBI_ instance by:
 ```
 &DBI{Db: created_handle}
-``
+```
 
 #### Example
 
