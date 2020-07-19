@@ -1,18 +1,22 @@
 # taodbi
-An abstract interface class in GO to access the big data system TDengine. Check *godoc* from [here](https://godoc.org/github.com/genelet/taodbi)
+An abstract interface class to access the big data system TDengine in GO. Check *godoc* from [here](https://godoc.org/github.com/genelet/taodbi)
 
 [![GoDoc](https://godoc.org/github.com/genelet/taodbi?status.svg)](https://godoc.org/github.com/genelet/taodbi)
 
-[TDengine](https://github.com/taosdata/TDengine) is a very fast open-source database system. It comes with a [GO connector](https://www.taosdata.com/en/documentation/connector/#Go-Connector). This _taodbi_ GO package provides a set of tools to access it in the so-called _abstract_ way, which some users may feel more convenient to use. In advanced usage, one can call multiple *JOINed* database tables with one action, just like in relational database.
+[TDengine](https://github.com/taosdata/TDengine) is a very fast open-source database system. It comes with a [GO connector](https://github.com/taosdata/driver-go). This _taodbi_ GO package provides _abstract_ classes to access it, which some users may feel more convenient to use. In an advanced usage, one can call multiple *JOINed* tables in one statement, just like relational database.
 
 ### Installation
 
-Clone from [github](https://github.com/genelet/taodbi)
+```
+$ go get -u github.com/genelet/taodbi
+```
+
+Or manually clone from [github](https://github.com/genelet/taodbi) and place it under your GOPATH
 ```
 $ git clone https://github.com/genelet/taodbi.git
 ```
 
-You need to install TDengine, or download the source, and symbolic link its GO connector _taosSql_ to your *GOPATH*.
+There are three levels of usages: Basic, Map and Advanced.
 
 
 ## Chapter 1. BASIC USAGE
