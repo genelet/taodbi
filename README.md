@@ -71,7 +71,7 @@ func main() {
 
     dbi := &taodbi.DBI{Db: db}
 
-    err = dbi.ExecSQL(`CREATE DATABASE IF NOT EXISTS mytest precision "us"`)
+    err = dbi.ExecSQL(`CREATE DATABASE IF NOT EXISTS mydbi precision "us"`)
     if err != nil { panic(err) }
     err = dbi.ExecSQL(`USE mydbi`)
     if err != nil { panic(err) }
