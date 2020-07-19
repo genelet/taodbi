@@ -22,37 +22,82 @@ There are three levels of usages: Basic, Map and Advanced.
 ## Chapter 1. BASIC USAGE
 
 
-### 1.1) Constructor
+### 1.1) Data Type _DBI_
+
+The struct _DBI_ provides wrapped functions on top of the standard _database/sql_ handle.
 ```
+package taodbi
+
 type DBI struct {
-        Db       *sql.DB
-        Affected int64
+    Db        *sql.DB
+    Affected  int64
 }
 
 ```
-Class _DBI_ provides wrapped functions on top of the standard _database/sql_: _Db_. _Affected_ saves affected number of rows after an operation.
+where _Db_ is the database handle; _Affected_ saves affected number of rows after an operation.
+
+#### Create a new handle
+
+Use this function:
+```
+func Open(dataSourceName string) (*DB, error)
+```
+So you get a _DBI_ instance by:
+```
+&DBI{Db: created_handle}
+``
+
+#### Example
 
 Create an instance by:
 ```
-package mytao
+package main
 
 import (
-        "database/sql"
-        "taosSql"
-        "taodbi"
-        "time"
+    "log"
+    "os"
+    "github.com/genelet/taodbi"
 )
 
-db, err := sql.Open("db_type":"taosSql", "root:taosdata@/tcp(127.0.0.1:0)/test")
-if err != nil {
-    panic(err)
-}
+func main() {
+    db, err := taodbi.Open("root:taosdata@/tcp(127.0.0.1:0)/");
+    if err != nil { panic(err) }
+    defer db.Close()
 
-dbi := &taodbi.DBI{Db: db}
+    dbi := &taodbi.DBI{Db: db}
+
+    err = dbi.ExecSQL(`CREATE DATABASE IF NOT EXISTS mytest precision "us"`)
+    if err != nil { panic(err) }
+    err = dbi.ExecSQL(`USE mydbi`)
+    if err != nil { panic(err) }
+    err = dbi.ExecSQL(`DROP TABLE IF EXISTS mytable`)
+    if err != nil { panic(err) }
+    err = dbi.ExecSQL(`CREATE TABLE mytable 
+(ts timestamp, id int, name binary(8), len tinyint, flag bool, notes binary(8), fv float, dv double)`)
+    if err != nil { panic(err) }
+    err = dbi.ExecSQL(`INSERT INTO mytable (ts, id, name, len, flag, notes, fv, dv)
+VALUES (now, ?, ?, 30, true, 'abcdefgh', 789.123, 456.789)`, 1234, `company`)
+    if err != nil { panic(err) }
+    lists := make([]map[string]interface{},0)
+    err = dbi.QuerySQL(&lists,
+`SELECT ts, id, name, len, flag, fv FROM mytable WHERE id=?`, 1234)
+    if err != nil { panic(err) }
+    
+    log.Printf("%v", lists)
+
+    err = dbi.ExecSQL(`DROP DATABASE IF EXISTS mydbi`)
+    if err != nil { panic(err) }
+
+    os.Exit(0)
+}
+```
+Running this example will report something like
+```
+[map[flag:true fv:789.123 id:1234 len:30 name:company ts:2020-07-19 09:07:48.341270]]
 ```
 
 
-### 1.2) Execute a database or table action, _ExecSQL_
+### 1.2) Execute an action on database or table, _ExecSQL_
 
 ```
 err = dbi.ExecSQL(`CREATE DATABASE mytest`)
