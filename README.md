@@ -54,7 +54,7 @@ So you get a _DBI_ instance by:
 
 #### Example
 
-Create an instance by:
+Create an instance; use it to create a new database and a table; add few rows; and query rows:
 ```
 package main
 
