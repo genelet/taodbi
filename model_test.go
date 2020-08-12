@@ -31,12 +31,10 @@ func TestModel(t *testing.T) {
 	if model.Affected != 1 {
 		t.Errorf("%d wanted", model.Affected)
 	}
-	time.Sleep(1 * time.Millisecond)
 	hash = map[string]interface{}{"x":"c1234567","y":"d1234567","z":"e1234"}
 	model.ARGS = hash
 	err = model.Insert()
 	if err != nil { panic(err) }
-	time.Sleep(1 * time.Millisecond)
 	hash = map[string]interface{}{"x":"f1234567","y":"g1234567","z":"e1234"}
 	model.ARGS = hash
 	err = model.Insert()
@@ -163,7 +161,6 @@ func TestPagination(t *testing.T) {
 		model.ARGS = hash
 		err = model.Insert()
 		if err != nil { panic(err) }
-		time.Sleep(1 * time.Millisecond)
 	}
 	model.ARGS = map[string]interface{}{"rowcount":20}
 	err = model.Topics()
@@ -207,13 +204,11 @@ func TestUInsupd(t *testing.T) {
     if err != nil { panic(err) }
 	id := model.CurrentRow["id"].(int64)
 
-    time.Sleep(1 * time.Millisecond)
     hash = map[string]interface{}{"x":"c1234567","y":"d1234567","z":"e1234"}
     model.ARGS = hash
     err = model.Insupd()
     if err != nil { panic(err) }
 
-    time.Sleep(1 * time.Millisecond)
     hash = map[string]interface{}{"x":"a1234567","y":"b1234567","z":"e1234"}
     model.ARGS = hash
     err = model.Insupd()
@@ -253,14 +248,12 @@ func TestNextPages(t *testing.T) {
     if err != nil { panic(err) }
     id1 := model.CurrentRow["id"].(int64)
 
-    time.Sleep(1 * time.Millisecond)
     hash = map[string]interface{}{"x":"c1234567","y":"d1234567","z":"e1234"}
     model.ARGS = hash
     err = model.Insupd()
     if err != nil { panic(err) }
     id2 := model.CurrentRow["id"].(int64)
 
-    time.Sleep(1 * time.Millisecond)
     hash = map[string]interface{}{"x":"e1234567","y":"f1234567","z":"e1234"}
     model.ARGS = hash
     err = model.Insupd()
@@ -285,19 +278,16 @@ func TestNextPages(t *testing.T) {
     err = supp.Insert()
     if err != nil { panic(err) }
 
-    time.Sleep(1 * time.Millisecond)
     hash = map[string]interface{}{"id":id1,"child":"sam"}
     supp.ARGS = hash
     err = supp.Insert()
     if err != nil { panic(err) }
 
-    time.Sleep(1 * time.Millisecond)
     hash = map[string]interface{}{"id":id2,"child":"mary"}
     supp.ARGS = hash
     err = supp.Insert()
     if err != nil { panic(err) }
 
-    time.Sleep(1 * time.Millisecond)
     hash = map[string]interface{}{"id":id3,"child":"kkk"}
     supp.ARGS = hash
     err = supp.Insert()
@@ -369,20 +359,17 @@ func TestNextPagesMore(t *testing.T) {
     if err != nil { panic(err) }
     id1 := model.CurrentRow["id"].(int64)
 
-    time.Sleep(1 * time.Millisecond)
     hash = map[string]interface{}{"x":"c1234567","y":"d1234567","z":"e1234"}
     model.ARGS = hash
     err = model.Insupd()
     if err != nil { panic(err) }
     id2 := model.CurrentRow["id"].(int64)
 
-    time.Sleep(1 * time.Millisecond)
     hash = map[string]interface{}{"x":"e1234567","y":"f1234567","z":"e1234"}
     model.ARGS = hash
     err = model.Insupd()
     if err != nil { panic(err) }
     id3 := model.CurrentRow["id"].(int64)
-
 
 
 	supp, err := NewModel(getString("m3.json"))
@@ -401,25 +388,20 @@ func TestNextPagesMore(t *testing.T) {
     err = supp.Insert()
     if err != nil { panic(err) }
 
-    time.Sleep(1 * time.Millisecond)
     hash = map[string]interface{}{"id":id1,"child":"sam"}
     supp.ARGS = hash
     err = supp.Insert()
     if err != nil { panic(err) }
 
-    time.Sleep(1 * time.Millisecond)
     hash = map[string]interface{}{"id":id2,"child":"mary"}
     supp.ARGS = hash
     err = supp.Insert()
     if err != nil { panic(err) }
 
-    time.Sleep(1 * time.Millisecond)
     hash = map[string]interface{}{"id":id3,"child":"kkk"}
     supp.ARGS = hash
     err = supp.Insert()
     if err != nil { panic(err) }
-
-
 
 
 	st, err := NewModel(getString("m3.json"))

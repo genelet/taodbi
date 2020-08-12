@@ -1,6 +1,7 @@
 package taodbi
 
 import (
+	"errors"
 	"strings"
 	"database/sql"
     _ "github.com/taosdata/driver-go/taosSql"
@@ -189,27 +190,9 @@ func (self *DBI) pickup(rows *sql.Rows, lists *[]map[string]interface{}, type_la
 	for i := range select_labels {
 		if isType {
 			switch type_labels[i] {
-			case "int":
+			case "int", "int8", "int16", "int32", "uint", "uint8", "uint16", "uint32", "int64":
 				x[i] = new(sql.NullInt64)
-			case "int8":
-				x[i] = new(sql.NullInt64)
-			case "int16":
-				x[i] = new(sql.NullInt64)
-			case "int32":
-				x[i] = new(sql.NullInt64)
-			case "uint":
-				x[i] = new(sql.NullInt64)
-			case "uint8":
-				x[i] = new(sql.NullInt64)
-			case "uint16":
-				x[i] = new(sql.NullInt64)
-			case "uint32":
-				x[i] = new(sql.NullInt64)
-			case "int64":
-				x[i] = new(sql.NullInt64)
-			case "float32":
-				x[i] = new(sql.NullFloat64)
-			case "float64":
+			case "float32", "float64":
 				x[i] = new(sql.NullFloat64)
 			case "bool":
 				x[i] = new(sql.NullBool)
@@ -293,8 +276,13 @@ func (self *DBI) pickup(rows *sql.Rows, lists *[]map[string]interface{}, type_la
 					}
 				case "string":
 					x := x[j].(*sql.NullString)
+					n := len(x.String)
 					if x.Valid {
-						res[v] = strings.TrimRight(x.String, "\x00")
+						if n>=2 {
+							res[v] = strings.TrimRight(x.String[:n-2], "\x00")
+						} else {
+							errors.New("wrong string output: " + x.String)
+						}
 					}
 				default:
 				}
@@ -303,9 +291,21 @@ func (self *DBI) pickup(rows *sql.Rows, lists *[]map[string]interface{}, type_la
 				if name != nil {
 					switch name.(type) {
 					case []uint8:
-						res[v] = strings.TrimRight(string(name.([]uint8)), "\x00")
+						x := string(name.([]uint8))
+						n := len(x)
+						if n>=2 {
+							res[v] = strings.TrimRight(x[:n-2], "\x00")
+						} else {
+							errors.New("wrong string output: " + x)
+						}
 					case string:
-						res[v] = strings.TrimRight(name.(string), "\x00")
+						x := name.(string)
+						n := len(x)
+						if n>=2 {
+							res[v] = strings.TrimRight(x[:n-2], "\x00")
+						} else {
+							errors.New("wrong string output: " + x)
+						}
 					default:
 						res[v] = name
 					}

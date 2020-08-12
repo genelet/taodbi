@@ -108,6 +108,10 @@ func TestCrudDb(t *testing.T) {
 	dbi := DBI{Db: db}
 	crud := &Crud{DBI: dbi, CurrentTable: "atesting", CurrentKey: "id"}
 
+	err = crud.ExecSQL(`create database if not exists demodb precision "us"`)
+	if err != nil {
+		panic(err)
+	}
 	err = crud.ExecSQL(`drop table if exists atesting`)
 	if err != nil {
 		panic(err)
@@ -120,9 +124,8 @@ func TestCrudDb(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	id := time.Now().UnixNano() / int64(time.Millisecond)
+	id := time.Now().UnixNano() / int64(time.Microsecond)
 	hash := map[string]interface{}{"id": id, "x": "a1234567", "y": "b1234567"}
-	time.Sleep(1 * time.Millisecond)
 	err = crud.InsertHash(hash)
 	if err != nil {
 		panic(err)
@@ -130,7 +133,6 @@ func TestCrudDb(t *testing.T) {
 	if crud.Affected != 1 {
 		t.Errorf("%d wanted", crud.Affected)
 	}
-	time.Sleep(1 * time.Millisecond)
 	hash = map[string]interface{}{"x": "c1234567", "y": "d1234567"}
 	err = crud.InsertHash(hash)
 	if err != nil {

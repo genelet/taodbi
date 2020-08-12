@@ -49,11 +49,7 @@ func TestLong(t *testing.T) {
 	}
 	dbi := &DBI{Db: db}
 
-	err = dbi.ExecSQL(`drop database ` + dbname)
-	if err != nil {
-		panic(err)
-	}
-	err = dbi.ExecSQL(`create database ` + dbname)
+	err = dbi.ExecSQL(`create database if not exists ` + dbname + ` precision "us"`)
 	if err != nil {
 		panic(err)
 	}
@@ -62,6 +58,10 @@ func TestLong(t *testing.T) {
 		panic(err)
 	}
 	tb := "demot"
+	err = dbi.ExecSQL("drop table if exists " + tb)
+	if err != nil {
+		panic(err)
+	}
 	err = dbi.ExecSQL("create table " + tb + " (ts timestamp, id int, name binary(8), len tinyint, flag bool, notes binary(8), fv float, dv double)")
 	if err != nil {
 		panic(err)
@@ -75,7 +75,6 @@ func TestLong(t *testing.T) {
 			panic(err)
 		}
 		n += dbi.Affected
-		time.Sleep(1 * time.Millisecond)
 	}
 	et := time.Now()
 	if n != 1000 {
@@ -135,11 +134,7 @@ func TestShort(t *testing.T) {
 	}
 	dbi := &DBI{Db: db}
 
-	err = dbi.ExecSQL(`drop database ` + dbname)
-	if err != nil {
-		panic(err)
-	}
-	err = dbi.ExecSQL(`create database ` + dbname)
+	err = dbi.ExecSQL(`create database if not exists ` + dbname + ` precision "us"`)
 	if err != nil {
 		panic(err)
 	}
@@ -148,6 +143,10 @@ func TestShort(t *testing.T) {
 		panic(err)
 	}
 	tb := "demot"
+	err = dbi.ExecSQL("drop table if exists " + tb)
+	if err != nil {
+		panic(err)
+	}
 	err = dbi.ExecSQL("create table " + tb + " (ts timestamp, id int, name binary(8), len tinyint, flag bool, notes binary(8), fv float, dv double)")
 	if err != nil {
 		panic(err)
@@ -160,14 +159,12 @@ func TestShort(t *testing.T) {
 			panic(err)
 		}
 		n += dbi.Affected
-		time.Sleep(1 * time.Millisecond)
 	}
 	err = dbi.DoSQL("INSERT INTO demot VALUES (now, ?, 'beijing', 111, true, 'abcdefgh', 789.123, 456.789)", 20000)
 	if err != nil {
 		panic(err)
 	}
 
-	time.Sleep(1 * time.Millisecond)
 	err = dbi.DoSQL("INSERT INTO demot (ts,id,name) VALUES (now, ?, 'beijing')", 30000)
 	if err != nil {
 		panic(err)
@@ -214,6 +211,9 @@ func TestShort(t *testing.T) {
 		l0["name"] != "beijing" ||
 		l0["notes"] != "abcdefgh" {
 		t.Errorf("wrong first row: %#v", l0)
+//dbi_test.go:213: wrong first row: map[string]interface {}{"dv":456.789, "flag":true, "fv":789.123, "id":0, "len":111, "name":"beijing\x00\a", "notes":"abcdefgh\b", "ts":"2020-08-11 11:27:13.37502"}
+ //   dbi_test.go:221: wrong last row: map[string]interface {}{"id":30000, "name":"beijing\x00oo", "ts":"2020-08-11 11:27:14.38730"}
+
 	}
 	if ln["dv"] != nil ||
 		ln["fv"] != nil ||
@@ -285,11 +285,7 @@ func TestInt(t *testing.T) {
 	}
 	dbi := &DBI{Db: db}
 
-	err = dbi.ExecSQL(`drop database ` + dbname)
-	if err != nil {
-		panic(err)
-	}
-	err = dbi.ExecSQL(`create database ` + dbname)
+	err = dbi.ExecSQL(`create database if not exists ` + dbname + ` precision "us"`)
 	if err != nil {
 		panic(err)
 	}
@@ -298,6 +294,10 @@ func TestInt(t *testing.T) {
 		panic(err)
 	}
 	tb := "demot"
+	err = dbi.ExecSQL("drop table if exists " + tb)
+	if err != nil {
+		panic(err)
+	}
 	err = dbi.ExecSQL("create table " + tb + " (ts timestamp, id int, name binary(8), len tinyint, flag bool, notes binary(8), fv float, dv double)")
 	if err != nil {
 		panic(err)
@@ -305,23 +305,19 @@ func TestInt(t *testing.T) {
 
 	n := int64(0)
 	for i := 0; i < 10; i++ {
-		//err = dbi.DoSQL("INSERT INTO demot VALUES (?, ?, 'beijing', 111, true, 'abcdefgh', 789.123, 456.789)", time.Now().UnixNano(), i)
-		err = dbi.DoSQL("INSERT INTO demot VALUES (?, ?, 'beijing', 111, true, 'abcdefgh', 789.123, 456.789)", time.Now().UnixNano()/int64(time.Millisecond), i)
+		err = dbi.DoSQL("INSERT INTO demot VALUES (?, ?, 'beijing', 111, true, 'abcdefgh', 789.123, 456.789)", time.Now().UnixNano()/int64(time.Microsecond), i)
 		if err != nil {
 			panic(err)
 		}
 		n += dbi.Affected
-		time.Sleep(1 * time.Millisecond)
 	}
-	//err = dbi.DoSQL("INSERT INTO demot VALUES (?, ?, 'beijing', 111, true, 'abcdefgh', 789.123, 456.789)", time.Now().UnixNano(), 20000)
-	err = dbi.DoSQL("INSERT INTO demot VALUES (?, ?, 'beijing', 111, true, 'abcdefgh', 789.123, 456.789)", time.Now().UnixNano()/int64(time.Millisecond), 20000)
+	err = dbi.DoSQL("INSERT INTO demot VALUES (?, ?, 'beijing', 111, true, 'abcdefgh', 789.123, 456.789)", time.Now().UnixNano()/int64(time.Microsecond), 20000)
 	if err != nil {
 		panic(err)
 	}
 
-	time.Sleep(1 * time.Millisecond)
-	// now is in milliseconds automatically
-	err = dbi.DoSQL("INSERT INTO demot (ts,id,name) VALUES (now, ?, ?)", 30000, "'beijing'")
+	// now is in microsecond automatically
+	err = dbi.DoSQL("INSERT INTO demot (ts,id,name) VALUES (now, ?, ?)", 30000, "beijing")
 	if err != nil {
 		panic(err)
 	}
