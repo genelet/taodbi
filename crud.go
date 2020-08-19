@@ -59,13 +59,12 @@ func (self *Crud) insertHash(args map[string]interface{}) error {
     if err := self.DoSQL(sql, values...); err != nil {
 		return err
 	}
-    id := self.LastID
-    if id == 0 {
-        if err := self.DB.QueryRow("SELECT LAST(" + self.CurrentKey + ") FROM " + self.CurrentTable).Scan(&id); err != nil {
-            return err
-        }
-        self.LastID = id
+	id := int64(0)
+    if err := self.DB.QueryRow("SELECT LAST(" + self.CurrentKey + ") FROM " + self.CurrentTable).Scan(&id); err != nil {
+        return err
     }
+    self.LastID = id
+
 	return nil
 }
 

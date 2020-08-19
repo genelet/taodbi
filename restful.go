@@ -1,7 +1,6 @@
 package taodbi
 
 import (
-//"log"
 	"errors"
 	"io/ioutil"
 	"database/sql"
@@ -34,6 +33,13 @@ func newRestful(db *sql.DB, filename string) (*Restful, error) {
     return parsed, nil
 }
 
+func (self *Restful) getStatus(id interface{}) (bool, error) {
+	s := self.StatusTable
+	status := false
+	err := self.DB.QueryRow("SELECT LAST("+s.statusColumn()+") FROM "+s.CurrentTable+" WHERE "+s.ForeignKey+"=?", id).Scan(&status)
+	return status, err
+}
+
 // insertRest inserts one row into each table.
 // args: the input row data expressed as url.Values.
 // The keys are column names, and their values are columns' values.
@@ -47,11 +53,26 @@ func (self *Restful) insertRest(args map[string]interface{}) error {
 		}
 		extra[k] = v
 	}
-	if err := self.insertHash(extra); err != nil {
+
+	var id interface{}
+
+	lists := make([]map[string]interface{}, 0)
+	if err := self.topicsHash(&lists, self.CurrentKey, "", extra); err != nil {
 		return err
 	}
-
-	id := self.LastID
+	if len(lists)>0 {
+		id = lists[0][self.CurrentKey]
+		if status, err := self.getStatus(id); err != nil {
+			return err
+		} else if status {
+			return errors.New("current unique key already taken")
+		}
+		self.LastID = id.(int64)
+	} else if err := self.insertHash(extra); err != nil {
+		return err
+	} else {
+		id = self.LastID
+	}
 
 	p := self.ProfileTable
 	extra = make(map[string]interface{})
@@ -138,18 +159,17 @@ func (self *Restful) insupdRest(args map[string]interface{}) error {
 	} else if len(lists) == 1 {
 		self.Updated = true
 		id := lists[0][self.CurrentKey]
-        args[p.ForeignKey] = id
-		if err := self.updateRest(args, []interface{}{id}, nil); err != nil {
+		status, err := self.getStatus(id)
+		if err == nil && !status {
+			err = self.DoSQL("INSERT INTO "+self.StatusTable.CurrentTable+" VALUES (now, ?, true)", id)
+		}
+		if err != nil {
 			return err
 		}
 
-		s := self.StatusTable
-		status := false
-		err := self.DB.QueryRow("SELECT LAST("+s.statusColumn()+") FROM "+s.CurrentTable+" WHERE "+s.ForeignKey+"=?", id).Scan(&status)
-		if err == nil && !status {
-			return self.DoSQL("INSERT INTO "+s.CurrentTable+" VALUES (now, ?, true)", id)
-		}
-		return err
+        args[p.ForeignKey] = id
+		// unlike insertRest, columns without values will NOT be filled with the last ones
+		return p.insertHash(args)
 	}
 
 	self.Updated = false
@@ -168,13 +188,13 @@ func (self *Restful) getPlainLists(lastID interface{}, rowcount int, reverse boo
 	gsql := self.CurrentKey
 	order := "ORDER BY " + self.CurrentKey
 	if reverse {
-		gsql += ">"
+		gsql += "<"
 		order += " DESC "
 	} else {
-		gsql += "<"
+		gsql += ">"
 	}
 	gsql += fmt.Sprintf("%d", lastID)
-	order += "LIMIT " + fmt.Sprintf("%d", rowcount)
+	order += " LIMIT " + fmt.Sprintf("%d", rowcount)
 	lists := make([]map[string]interface{},0)
 	if err := self.topicsHash(&lists, self.CurrentKey, order, map[string]interface{}{"_gsql":gsql}); err != nil {
 		return nil, err
@@ -215,15 +235,11 @@ func (self *Restful) topicsRest(rowcount int, reverse bool, lastID interface{}, 
 		count += nMain
 		lastID = ids[nMain-1]
 
-		s := self.StatusTable
-		c := s.statusColumn()
 		outs := make([]interface{}, 0)
 		for _, id := range ids {
-			status := false
-			if err := self.DB.QueryRow("SELECT LAST("+c+") FROM "+s.CurrentTable+" WHERE "+s.ForeignKey+"=?", id).Scan(&status); err != nil {
+			if status, err := self.getStatus(id); err != nil {
 				return err
-			}
-			if status {
+			} else if status {
 				outs = append(outs, id)
 			}
 		}
@@ -252,24 +268,57 @@ func (self *Restful) topicsRest(rowcount int, reverse bool, lastID interface{}, 
 	return nil
 }
 
-// totalRest returns the total number of rows available
+// totalRest returns the start, end and total number of rows available
 // This function is used for pagination.
-// v: the total number is returned in this referenced variable
 // extra: optional, extra constraints on WHERE statement.
 //
-/*
-func (self *Restful) totalRest(v interface{}, extra ...url.Values) error {
-	str := "SELECT COUNT(*) FROM " + self.CurrentTable
+func (self *Restful) totalRest(start, end, v, n *int64) error {
+	query := "SELECT "+self.CurrentKey+" FROM " + self.CurrentTable
+	sth, err := self.DB.Prepare(query)
+	if err != nil {
+        return err
+    }
+	defer sth.Close()
 
-	if hasValue(extra) {
-		where, values := selectCondition(extra[0])
-		if where != "" {
-			str += "\nWHERE " + where
+	s := self.StatusTable
+	sta, err := self.DB.Prepare("SELECT LAST("+s.statusColumn()+") FROM "+s.CurrentTable+" WHERE "+s.ForeignKey+"=?")
+	if err != nil {
+        return err
+    }
+	defer sth.Close()
+
+	rows, err := sth.Query()
+    if err != nil {
+        return err
+    }
+	defer rows.Close()
+
+	status := false
+	id := int64(0)
+	i  := int64(0)
+	raw:= int64(0)
+	for rows.Next() {
+		raw++
+		if err = rows.Scan(&id); err != nil {
+            return err
+        }
+		if err := sta.QueryRow(id).Scan(&status); err != nil {
+			return err
 		}
-		return self.DB.QueryRow(str, values...).Scan(v)
+		if status {
+			if i==0 {
+				*start = id
+			}
+			i++
+		}
 	}
+    if err := rows.Err(); err != nil && err != sql.ErrNoRows {
+        return err
+    }
 
-	return self.DB.QueryRow(str).Scan(v)
+	*end = id
+	*v = i
+	*n = raw
+	return nil
 }
-*/
 

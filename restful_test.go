@@ -63,5 +63,58 @@ func TestRestfulNew(t *testing.T) {
 	lists := make([]map[string]interface{}, 0)
 	ids := []interface{}{id1,id2,id3,id4,id5}
 	if err = rest.editRest(&lists, rest.ProfileTable.editHashPars, ids); err != nil { t.Fatal(err) }
-	t.Errorf("%v", lists)
+	if len(lists)!=5 || lists[3]["city"].(string) != "c4" {
+		t.Errorf("%v", lists)
+	}
+
+	args = map[string]interface{}{"firstname":"f44", "lastname":"l44", "gender":false, "street":"s44", "city":"c44", "province":24, "phone":"p44", "email":"e44"}
+	if err = rest.updateRest(args, []interface{}{id4}, nil); err != nil { t.Fatal(err) }
+
+	lists = make([]map[string]interface{}, 0)
+	ids = []interface{}{id1,id2,id3,id4,id5}
+	if err = rest.editRest(&lists, rest.ProfileTable.editHashPars, ids); err != nil { t.Fatal(err) }
+	if len(lists)!=5 || lists[3]["city"].(string) != "c44" {
+		t.Errorf("%v", lists)
+	}
+
+	if err = rest.deleteRest([]interface{}{id4}); err != nil { t.Fatal(err) }
+
+	lists = make([]map[string]interface{}, 0)
+	if err = rest.topicsRest(100, false, 0, &lists, rest.ProfileTable.topicsHashPars); err != nil { t.Fatal(err) }
+	if len(lists)!=4 || lists[3]["firstname"].(string) != "f5" {
+		t.Errorf("%v", lists)
+	}
+
+	args = map[string]interface{}{"username":"u4", "passwd":"p4", "firstname":"f4", "lastname":"l4", "gender":false, "street":"s4", "city":"c4", "province":2, "phone":"p4", "email":"e4"}
+	if err =  rest.insertRest(args); err != nil { t.Fatal(err) }
+	id44 := rest.LastID
+	lists = make([]map[string]interface{}, 0)
+	if err = rest.topicsRest(100, false, 0, &lists, rest.ProfileTable.topicsHashPars); err != nil { t.Fatal(err) }
+	if len(lists)!=5 || id4!=id44 || lists[3]["firstname"].(string) != "f4" {
+		t.Errorf("%v", lists[3])
+	}
+
+	lists = make([]map[string]interface{}, 0)
+	if err = rest.topicsRest(100, false, 0, &lists, rest.ProfileTable.topicsHashPars, map[string]interface{}{"province":2}); err != nil { t.Fatal(err) }
+	if len(lists)!=3 || lists[0]["firstname"].(string) != "f2" ||
+	                    lists[1]["firstname"].(string) != "f3" ||
+	                    lists[2]["firstname"].(string) != "f4" {
+		t.Errorf("%v", lists)
+	}
+
+	var start, end, v, n int64
+	if err := rest.totalRest(&start, &end, &v, &n); err != nil { t.Fatal(err) }
+	if start != id1 || end != id5 || v!=5 || n!=5 {
+		t.Errorf("%d %d %d %d", start, end, v, n)
+	}
+	if err := rest.totalRest(&start, &end, &v, &n); err != nil { t.Fatal(err) }
+	if start != id1 || end != id5 || v!=5 || n!=5 {
+		t.Errorf("%d %d %d %d", start, end, v, n)
+	}
+
+	if err = rest.deleteRest([]interface{}{id4}); err != nil { t.Fatal(err) }
+	if err := rest.totalRest(&start, &end, &v, &n); err != nil { t.Fatal(err) }
+	if start != id1 || end != id5 || v!=4 || n!=5 {
+		t.Errorf("%d %d %d %d", start, end, v, n)
+	}
 }

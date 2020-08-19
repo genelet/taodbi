@@ -26,7 +26,7 @@ func Quote(v interface{}) interface{} {
 
 // Quotes quote a slice of values for use in placeholders
 func Quotes(args []interface{}) []interface{} {
-	if args == nil || args[0] == nil {
+	if !hasValue(args) {
 		return nil
 	}
 	new_args := make([]interface{}, 0)
@@ -64,11 +64,13 @@ func (self *DBI) DoSQL(query string, args ...interface{}) error {
 		return err
 	}
 
+/*
     LastID, err := res.LastInsertId()
     if err != nil {
         return err
     }
     self.LastID = LastID
+*/
     affected, err := res.RowsAffected()
     if err != nil {
         return err
