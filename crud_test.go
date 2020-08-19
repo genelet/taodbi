@@ -7,95 +7,12 @@ import (
 	_ "github.com/taosdata/driver-go/taosSql"
 )
 
-func TestCrudStr(t *testing.T) {
-	select_par := "firstname"
-	sql, labels, types := selectType(select_par)
-	if sql != "firstname" || labels[0] != "firstname" {
-		t.Errorf("%s wanted", sql)
-	}
-	if types != nil {
-		t.Errorf("nil wanted but %#v", types)
-	}
-
-	select_pars := []string{"firstname", "lastname", "id"}
-	sql, labels, types = selectType(select_pars)
-	if sql != "firstname, lastname, id" &&
-		sql != "firstname, id, lastname" &&
-		sql != "id, firstname, lastname" &&
-		sql != "id, lastname, firstname" &&
-		sql != "lastname, id, firstname" &&
-		sql != "lastname, firstname, id" {
-		t.Errorf("%s wanted", sql)
-	}
-	if types != nil {
-		t.Errorf("nil wanted but %#v", types)
-	}
-
-	select_hash := map[string]string{"firstname": "string", "lastname": "string", "id": "int64"}
-	sql, labels, types = selectType(select_hash)
-	if sql != "id, firstname, lastname" &&
-		sql != "id, lastnaem, firstname" &&
-		sql != "firstname, lastname, id" &&
-		sql != "firstname, id, lastname" &&
-		sql != "lastname, firstname, id" &&
-		sql != "lastname, id, firstname" {
-		t.Errorf("%s wanted", sql)
-	}
-
-	extra := map[string]interface{}{"firstname": "Peter"}
-	sql, c := selectCondition(extra)
-	if sql != "(firstname =?)" {
-		t.Errorf("%s wanted", sql)
-	}
-	if c[0].(string) != "Peter" {
-		t.Errorf("%s wanted", c[0].(string))
-	}
-
-	extra = map[string]interface{}{"firstname": "Peter", "lastname": "Tong", "id": []int{1, 2, 3, 4}}
-	sql, c = selectCondition(extra)
-	if sql == "(firstname =?) AND (lastname =?) AND (id IN (?,?,?,?))" {
-		if c[0].(string) != "Peter" {
-			t.Errorf("%s wanted", c[0].(string))
-		}
-		if c[1].(string) != "Tong" {
-			t.Errorf("%s wanted", c[1].(string))
-		}
-		if c[2].(int) != 1 {
-			t.Errorf("%d wanted", c[2].(int))
-		}
-		if c[3].(int) != 2 {
-			t.Errorf("%d wanted", c[3].(int))
-		}
-		if c[4].(int) != 3 {
-			t.Errorf("%d wanted", c[4].(int))
-		}
-		if c[5].(int) != 4 {
-			t.Errorf("%d wanted", c[5].(int))
-		}
-	}
-
-	keyname := "user_id"
-	ids := []interface{}{11, 22, 33, 44, 55}
-	s, arr := singleCondition(keyname, ids, extra)
-	if s == "(user_id IN (?,?,?,?,?)) AND (firstname =?) AND (lastname =?) AND (id IN (?,?,?,?))" {
-		if arr[0].(int) != 11 {
-			t.Errorf("%d wanted", arr[0].(int))
-		}
-		if arr[1].(int) != 22 {
-			t.Errorf("%d wanted", arr[1].(int))
-		}
-		if arr[2].(int) != 33 {
-			t.Errorf("%d wanted", arr[2].(int))
-		}
-		if arr[3].(int) != 44 {
-			t.Errorf("%d wanted", arr[3].(int))
-		}
-		if arr[4].(int) != 55 {
-			t.Errorf("%d wanted", arr[4].(int))
-		}
-		if arr[5] != "Peter" {
-			t.Errorf("%s wanted", arr[5])
-		}
+func TestCrudFilterExtra(t *testing.T) {
+	extra := map[string]interface{}{"x":[]int{1,2,3,4}, "y":"a", "z":"c"}
+	extraNew := filterExtra([]string{"x","z"}, extra)
+	if len(extraNew["x"].([]int))!=4 || extraNew["z"].(string) != "c" {
+		t.Errorf("%#v", extraNew["x"].([]int))
+		t.Errorf("%#v", extraNew["z"].(string))
 	}
 }
 
@@ -105,28 +22,28 @@ func TestCrudDb(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	dbi := DBI{Db: db}
-	crud := &Crud{DBI: dbi, CurrentTable: "atesting", CurrentKey: "id"}
+	dbi := DBI{DB: db}
+	crud := &Crud{DBI: dbi, Table:Table{CurrentTable: "atesting", CurrentKey: "id"}}
 
-	err = crud.ExecSQL(`create database if not exists demodb precision "us"`)
+	err = crud.DoSQL(`create database if not exists demodb precision "us"`)
 	if err != nil {
 		panic(err)
 	}
-	err = crud.ExecSQL(`drop table if exists atesting`)
+	err = crud.DoSQL(`drop table if exists atesting`)
 	if err != nil {
 		panic(err)
 	}
-	err = crud.ExecSQL(`drop table if exists testing`)
+	err = crud.DoSQL(`drop table if exists testing`)
 	if err != nil {
 		panic(err)
 	}
-	err = crud.ExecSQL(`CREATE TABLE atesting (id timestamp, x binary(8), y binary(8))`)
+	err = crud.DoSQL(`CREATE TABLE atesting (id timestamp, x binary(8), y binary(8))`)
 	if err != nil {
 		panic(err)
 	}
 	id := time.Now().UnixNano() / int64(time.Microsecond)
 	hash := map[string]interface{}{"id": id, "x": "a1234567", "y": "b1234567"}
-	err = crud.InsertHash(hash)
+	err = crud.insertHash(hash)
 	if err != nil {
 		panic(err)
 	}
@@ -134,14 +51,14 @@ func TestCrudDb(t *testing.T) {
 		t.Errorf("%d wanted", crud.Affected)
 	}
 	hash = map[string]interface{}{"x": "c1234567", "y": "d1234567"}
-	err = crud.InsertHash(hash)
+	err = crud.insertHash(hash)
 	if err != nil {
 		panic(err)
 	}
 
 	lists := make([]map[string]interface{}, 0)
 	edit_pars := []string{"id", "x", "y"}
-	err = crud.EditHash(&lists, edit_pars, id)
+	err = crud.editHash(&lists, edit_pars, []interface{}{id})
 	if err != nil {
 		panic(err)
 	}
@@ -157,7 +74,7 @@ func TestCrudDb(t *testing.T) {
 
 	lists = make([]map[string]interface{}, 0)
 	select_pars := []string{"id", "x", "y"}
-	err = crud.TopicsHash(&lists, select_pars)
+	err = crud.topicsHash(&lists, select_pars, "")
 	if err != nil {
 		panic(err)
 	}
@@ -181,7 +98,7 @@ func TestCrudDb(t *testing.T) {
 	}
 
 	what := int64(0)
-	err = crud.TotalHash(&what)
+	err = crud.totalHash(&what)
 	if err != nil {
 		panic(err)
 	}
@@ -192,7 +109,7 @@ func TestCrudDb(t *testing.T) {
 	lists = make([]map[string]interface{}, 0)
 	select_pars = []string{"id", "x", "y"}
 	extra := map[string]interface{}{"x": "a1234567"}
-	err = crud.TopicsHash(&lists, select_pars, extra)
+	err = crud.topicsHash(&lists, select_pars, "", extra)
 	if err != nil {
 		panic(err)
 	}
@@ -210,4 +127,56 @@ func TestCrudDb(t *testing.T) {
 	}
 
 	db.Close()
+}
+
+func TestCrudEditFK(t *testing.T) {
+    c := newconf("config.json")
+    db, err := sql.Open(c.Db_type, c.Dsn_2)
+    if err != nil {
+        panic(err)
+    }
+    defer db.Close()
+
+    dbi := DBI{DB: db}
+    crud := &Crud{DBI: dbi, Table:Table{CurrentTable: "tmain", CurrentKey: "id", ForeignKey: "x", InsertPars: []string{"x","y"}}}
+    err = crud.DoSQL(`create database if not exists demodb precision "us"`)
+    if err != nil {
+        panic(err)
+    }
+    crud.DoSQL(`drop table if exists tmain`)
+    crud.DoSQL(`create table tmain (id timestamp, x binary(8), y binary(8))`)
+    id := time.Now().UnixNano() / int64(time.Microsecond)
+    hash := map[string]interface{}{"id": id, "x": "a1234567", "y": "b1234567"}
+    if err = crud.insertHash(hash); err != nil { panic(err) }
+    id1 := time.Now().UnixNano() / int64(time.Microsecond)
+    hash = map[string]interface{}{"id": id1, "x": "c1234567", "y": "d1234567"}
+    if err = crud.insertHash(hash); err != nil { panic(err) }
+    id2 := time.Now().UnixNano() / int64(time.Microsecond)
+    hash = map[string]interface{}{"id": id2, "x": "a1234567", "y": "f1234567"}
+    if err = crud.insertHash(hash); err != nil { panic(err) }
+    id3 := time.Now().UnixNano() / int64(time.Microsecond)
+    hash = map[string]interface{}{"id": id3, "x": "g1234567", "y": "h1234567"}
+    if err = crud.insertHash(hash); err != nil { panic(err) }
+
+    ids := []interface{}{"a1234567","c1234567","g1234567"}
+	lists := make([]map[string]interface{}, 0)
+    err = crud.editHashFK(&lists, []string{"id","x","y"}, ids)
+	if err != nil { panic(err) }
+	if len(lists) != 3 ||
+		lists[0]["x"] != "a1234567" || lists[0]["y"] != "f1234567" ||
+		lists[1]["x"] != "c1234567" || lists[1]["y"] != "d1234567" ||
+		lists[2]["x"] != "g1234567" || lists[2]["y"] != "h1234567" {
+		t.Errorf("%#v", lists)
+	}
+
+    extra := map[string]interface{}{"y":"h1234567"}
+	lists = make([]map[string]interface{}, 0)
+    err = crud.editHashFK(&lists, []string{"id","x","y"}, ids, extra)
+	if err != nil { panic(err) }
+	if len(lists) != 1 ||
+		lists[0]["x"] != "g1234567" || lists[0]["y"] != "h1234567" {
+		t.Errorf("%#v", lists)
+	}
+
+//    crud.DoSQL(`drop table if exists tmain`)
 }

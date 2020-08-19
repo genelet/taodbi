@@ -43,26 +43,26 @@ func TestLong(t *testing.T) {
 	c := newconf("config.json")
 
 	dbname := "demodb"
-	db, err := Open(c.Dsn_1)
+	db, err := open(c.Dsn_1)
 	if err != nil {
 		panic(err)
 	}
-	dbi := &DBI{Db: db}
+	dbi := &DBI{DB: db}
 
-	err = dbi.ExecSQL(`create database if not exists ` + dbname + ` precision "us"`)
+	err = dbi.DoSQL(`create database if not exists ` + dbname + ` precision "us"`)
 	if err != nil {
 		panic(err)
 	}
-	err = dbi.ExecSQL(`use ` + dbname)
+	err = dbi.DoSQL(`use ` + dbname)
 	if err != nil {
 		panic(err)
 	}
 	tb := "demot"
-	err = dbi.ExecSQL("drop table if exists " + tb)
+	err = dbi.DoSQL("drop table if exists " + tb)
 	if err != nil {
 		panic(err)
 	}
-	err = dbi.ExecSQL("create table " + tb + " (ts timestamp, id int, name binary(8), len tinyint, flag bool, notes binary(8), fv float, dv double)")
+	err = dbi.DoSQL("create table " + tb + " (ts timestamp, id int, name binary(8), len tinyint, flag bool, notes binary(8), fv float, dv double)")
 	if err != nil {
 		panic(err)
 	}
@@ -107,7 +107,7 @@ func TestLong(t *testing.T) {
 	lists = make([]map[string]interface{}, 0)
 	n = int64(0)
 	for i := 0; i < 10000; i++ {
-		err = dbi.QuerySQL(&lists,
+		err = dbi.SelectSQL(&lists,
 			"SELECT ts, id, name, len, flag, notes, fv, dv FROM demot LIMIT 20")
 		if err != nil {
 			panic(err)
@@ -128,26 +128,26 @@ func TestLong(t *testing.T) {
 func TestShort(t *testing.T) {
 	dbname := "demodb"
 	c := newconf("config.json")
-	db, err := sql.Open(c.Db_type, c.Dsn_1)
+	db, err := open(c.Dsn_1)
 	if err != nil {
 		panic(err)
 	}
-	dbi := &DBI{Db: db}
+	dbi := &DBI{DB: db}
 
-	err = dbi.ExecSQL(`create database if not exists ` + dbname + ` precision "us"`)
+	err = dbi.DoSQL(`create database if not exists ` + dbname + ` precision "us"`)
 	if err != nil {
 		panic(err)
 	}
-	err = dbi.ExecSQL(`use ` + dbname)
+	err = dbi.DoSQL(`use ` + dbname)
 	if err != nil {
 		panic(err)
 	}
 	tb := "demot"
-	err = dbi.ExecSQL("drop table if exists " + tb)
+	err = dbi.DoSQL("drop table if exists " + tb)
 	if err != nil {
 		panic(err)
 	}
-	err = dbi.ExecSQL("create table " + tb + " (ts timestamp, id int, name binary(8), len tinyint, flag bool, notes binary(8), fv float, dv double)")
+	err = dbi.DoSQL("create table " + tb + " (ts timestamp, id int, name binary(8), len tinyint, flag bool, notes binary(8), fv float, dv double)")
 	if err != nil {
 		panic(err)
 	}
@@ -283,22 +283,22 @@ func TestInt(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	dbi := &DBI{Db: db}
+	dbi := &DBI{DB: db}
 
-	err = dbi.ExecSQL(`create database if not exists ` + dbname + ` precision "us"`)
+	err = dbi.DoSQL(`create database if not exists ` + dbname + ` precision "us"`)
 	if err != nil {
 		panic(err)
 	}
-	err = dbi.ExecSQL(`use ` + dbname)
+	err = dbi.DoSQL(`use ` + dbname)
 	if err != nil {
 		panic(err)
 	}
 	tb := "demot"
-	err = dbi.ExecSQL("drop table if exists " + tb)
+	err = dbi.DoSQL("drop table if exists " + tb)
 	if err != nil {
 		panic(err)
 	}
-	err = dbi.ExecSQL("create table " + tb + " (ts timestamp, id int, name binary(8), len tinyint, flag bool, notes binary(8), fv float, dv double)")
+	err = dbi.DoSQL("create table " + tb + " (ts timestamp, id int, name binary(8), len tinyint, flag bool, notes binary(8), fv float, dv double)")
 	if err != nil {
 		panic(err)
 	}

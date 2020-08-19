@@ -2,22 +2,10 @@ package taodbi
 
 import (
 	"errors"
+	"net/url"
 	"strings"
 	"database/sql"
-    _ "github.com/taosdata/driver-go/taosSql"
 )
-
-// DBI is an abstract database interface to access TDEngine.
-// Db: the generic SQL handler.
-// Affected: number of row affected after each operation.
-type DBI struct {
-	Db       *sql.DB `json:"db,omitempty"`
-	Affected int64   `json:"affected,omitempty"`
-}
-
-func Open(ds string) (*sql.DB, error) {
-	return sql.Open("taosSql", ds)
-}
 
 // Quote escapes string to be used safely in placeholder.
 // The SQL functions in the package have already quoted so
@@ -48,27 +36,26 @@ func Quotes(args []interface{}) []interface{} {
 	return new_args
 }
 
-// ExecSQL is the same as the generic SQL's Exec, plus adding
-// the affected number of rows into Affected
-func (self *DBI) ExecSQL(str string, args ...interface{}) error {
-	res, err := self.Db.Exec(str, Quotes(args)...)
-	if err != nil {
-		return err
-	}
-
-	affectd, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	self.Affected = affectd
-
-	return nil
+// DBI simply embeds GO's generic SQL handler.
+// It adds a set of functions for easier database executions and queries.
+//
+type DBI struct {
+	// Embedding the generic database handle.
+	*sql.DB	       `json:"-"`
+	// LastID: the last auto id inserted, if the database provides
+	LastID int64   `json:"-"`
+	// Affected: the number of rows affected
+	Affected int64 `json:"-"`
 }
 
-// DoSQL is the same as ExecSQL, except for using prepared statement,
-// which is safe for concurrent use use by multiple goroutines.
-func (self *DBI) DoSQL(str string, args ...interface{}) error {
-	sth, err := self.Db.Prepare(str)
+// DoSQL is the same as SQL's Exec, except for using a prepared statement,
+// which is safe for concurrent use by multiple goroutines.
+//
+func (self *DBI) DoSQL(query string, args ...interface{}) error {
+	//glog.Infof("godbi SQL statement: %s", query)
+	//glog.Infof("godbi input data: %v", args)
+
+	sth, err := self.DB.Prepare(query)
 	if err != nil {
 		return err
 	}
@@ -77,88 +64,82 @@ func (self *DBI) DoSQL(str string, args ...interface{}) error {
 		return err
 	}
 
-	affected, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	self.Affected = affected
+    LastID, err := res.LastInsertId()
+    if err != nil {
+        return err
+    }
+    self.LastID = LastID
+    affected, err := res.RowsAffected()
+    if err != nil {
+        return err
+    }
+    self.Affected = affected
 
 	sth.Close()
 	return nil
 }
 
-// DoSQLs adds multiple rows at once, each of them is a slice
-func (self *DBI) DoSQLs(str string, args ...[]interface{}) error {
+// DoSQLs inserts multiple rows at once.
+// Each row is represented as array and the rows are array of array.
+//
+func (self *DBI) DoSQLs(query string, args ...[]interface{}) error {
+	//glog.Infof("godbi SQL statement: %s", query)
+	//glog.Infof("godbi input data: %v", args)
+
 	n := len(args)
 	if n == 0 {
-		return nil
+		return self.DoSQL(query)
 	} else if n == 1 {
-		return self.DoSQL(str, args[0]...)
+		return self.DoSQL(query, args[0]...)
 	}
 
 	m := len(args[0])
 	item := "(" + strings.Join(strings.Split(strings.Repeat("?", m), ""), ",") + ")"
-	str += ""
+	query += ""
 	new_args := make([]interface{}, 0)
 	for _, item := range args[0] {
 		new_args = append(new_args, item)
 	}
 	for i := 0; i < (n - 1); i++ {
-		str += " " + item
+		query += " " + item
 		new_args = append(new_args, args[i+1]...)
 	}
-	return self.DoSQL(str, new_args...)
+	return self.DoSQL(query, new_args...)
 }
 
-// QuerySQL selects rows and put them into lists, an array of maps.
-// It lets the generic SQL class to decides rows' data types.
-func (self *DBI) QuerySQL(lists *[]map[string]interface{}, str string, args ...interface{}) error {
-	return self.QuerySQLTypeLabel(lists, nil, nil, str, args...)
+// SelectSQL selects data rows as slice of maps into 'lists'.
+// The data types in the rows are determined dynamically by the generic handle.
+//
+func (self *DBI) SelectSQL(lists *[]map[string]interface{}, query string, args ...interface{}) error {
+	return self.SelectSQLTypeLabel(lists, nil, nil, query, args...)
 }
 
-// QuerySQLType selects rows and put them into lists, an array of maps.
-// It uses the give data types defined in types.
-func (self *DBI) QuerySQLType(lists *[]map[string]interface{}, types []string, str string, args ...interface{}) error {
-	return self.QuerySQLTypeLabel(lists, types, nil, str, args...)
+// SelectSQLType selects data rows as slice of maps into 'lists'.
+// The data types in the rows are predefined in the 'typeLabels'.
+//
+func (self *DBI) SelectSQLType(lists *[]map[string]interface{}, typeLabels []string, query string, args ...interface{}) error {
+	return self.SelectSQLTypeLabel(lists, typeLabels, nil, query, args...)
 }
 
-// QuerySQLLabel selects rows and put them into lists, an array of maps.
-// The keys in the maps uses the give name defined in labels.
-func (self *DBI) QuerySQLLabel(lists *[]map[string]interface{}, labels []string, str string, args ...interface{}) error {
-	return self.QuerySQLTypeLabel(lists, nil, labels, str, args...)
+// SelectSQLLabel selects data rows as slice of maps into 'lists'.
+// The data types of the rows are determined dynamically by the generic handle.
+// The original SQL column names will be renamed by 'selectLabels'.
+//
+func (self *DBI) SelectSQLLabel(lists *[]map[string]interface{}, selectLabels []string, query string, args ...interface{}) error {
+	return self.SelectSQLTypeLabel(lists, nil, selectLabels, query, args...)
 }
 
-// QuerySQLLabel selects rows and put them into lists, an array of maps.
-// It uses the give data types defined in types_labels.
-// and the keys in the maps uses the give name defined in select_labels.
-func (self *DBI) QuerySQLTypeLabel(lists *[]map[string]interface{}, type_labels []string, select_labels []string, str string, args ...interface{}) error {
-	rows, err := self.Db.Query(str, Quotes(args)...)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
+// SelectSQLTypeLabel selects data rows as slice of maps into 'lists'.
+// The data types of the rows are predefined in the 'typeLabels'.
+// The original SQL column names will be renamed by 'selectLabels'.
+//
+func (self *DBI) SelectSQLTypeLabel(lists *[]map[string]interface{}, typeLabels []string, selectLabels []string, query string, args ...interface{}) error {
+	//glog.Infof("godbi SQL statement: %s", query)
+	//glog.Infof("godbi select columns: %v", selectLabels)
+	//glog.Infof("godbi column types: %v", typeLabels)
+	//glog.Infof("godbi input data: %v", args)
 
-	return self.pickup(rows, lists, type_labels, select_labels, str)
-}
-
-// SelectSQL is the same as QuerySQL excepts it uses a prepared statement.
-func (self *DBI) SelectSQL(lists *[]map[string]interface{}, str string, args ...interface{}) error {
-	return self.SelectSQLTypeLabel(lists, nil, nil, str, args...)
-}
-
-// SelectSQLType is the same as QuerySQLType excepts it uses a prepared statement.
-func (self *DBI) SelectSQLType(lists *[]map[string]interface{}, type_labels []string, str string, args ...interface{}) error {
-	return self.SelectSQLTypeLabel(lists, type_labels, nil, str, args...)
-}
-
-// SelectSQLLable is the same as QuerySQLLabel excepts it uses a prepared statement.
-func (self *DBI) SelectSQLLabel(lists *[]map[string]interface{}, select_labels []string, str string, args ...interface{}) error {
-	return self.SelectSQLTypeLabel(lists, nil, select_labels, str, args...)
-}
-
-// SelectSQLTypeLabel is the same as QuerySQLTypeLabel excepts it uses a prepared statement.
-func (self *DBI) SelectSQLTypeLabel(lists *[]map[string]interface{}, type_labels []string, select_labels []string, str string, args ...interface{}) error {
-	sth, err := self.Db.Prepare(str)
+	sth, err := self.DB.Prepare(query)
 	if err != nil {
 		return err
 	}
@@ -169,27 +150,26 @@ func (self *DBI) SelectSQLTypeLabel(lists *[]map[string]interface{}, type_labels
 	}
 	defer rows.Close()
 
-	return self.pickup(rows, lists, type_labels, select_labels, str)
+	return self.pickup(rows, lists, typeLabels, selectLabels, query)
 }
 
-func (self *DBI) pickup(rows *sql.Rows, lists *[]map[string]interface{}, type_labels []string, select_labels []string, str string) error {
+func (self *DBI) pickup(rows *sql.Rows, lists *[]map[string]interface{}, typeLabels []string, selectLabels []string, query string) error {
 	var err error
-	if select_labels == nil {
-		select_labels, err = rows.Columns()
-		if err != nil {
+	if selectLabels == nil {
+		if selectLabels, err = rows.Columns(); err != nil {
 			return err
 		}
 	}
 
 	isType := false
-	if type_labels != nil {
+	if typeLabels != nil {
 		isType = true
 	}
-	names := make([]interface{}, len(select_labels))
-	x := make([]interface{}, len(select_labels))
-	for i := range select_labels {
+	names := make([]interface{}, len(selectLabels))
+	x := make([]interface{}, len(selectLabels))
+	for i := range selectLabels {
 		if isType {
-			switch type_labels[i] {
+			switch typeLabels[i] {
 			case "int", "int8", "int16", "int32", "uint", "uint8", "uint16", "uint32", "int64":
 				x[i] = new(sql.NullInt64)
 			case "float32", "float64":
@@ -206,14 +186,13 @@ func (self *DBI) pickup(rows *sql.Rows, lists *[]map[string]interface{}, type_la
 	}
 
 	for rows.Next() {
-		err = rows.Scan(x...)
-		if err != nil {
+		if err = rows.Scan(x...); err != nil {
 			return err
 		}
 		res := make(map[string]interface{})
-		for j, v := range select_labels {
+		for j, v := range selectLabels {
 			if isType {
-				switch type_labels[j] {
+				switch typeLabels[j] {
 				case "int":
 					x := x[j].(*sql.NullInt64)
 					if x.Valid {
@@ -316,6 +295,41 @@ func (self *DBI) pickup(rows *sql.Rows, lists *[]map[string]interface{}, type_la
 	}
 	if err := rows.Err(); err != nil && err != sql.ErrNoRows {
 		return err
+	}
+	return nil
+}
+
+// GetSQLLabel returns one row as map into 'res'.
+// The column names are replaced by 'selectLabels'
+//
+func (self *DBI) GetSQLLabel(res map[string]interface{}, query string, selectLabels []string, args ...interface{}) error {
+	lists := make([]map[string]interface{}, 0)
+	if err := self.SelectSQLLabel(&lists, selectLabels, query, args...); err != nil {
+		return err
+	}
+	if len(lists) >= 1 {
+		for k, v := range lists[0] {
+			if v != nil {
+				res[k] = v
+			}
+		}
+	}
+	return nil
+}
+
+// GetArgs returns one row as url.Values into 'res', as in web application.
+//
+func (self *DBI) GetArgs(res url.Values, query string, args ...interface{}) error {
+	lists := make([]map[string]interface{}, 0)
+	if err := self.SelectSQL(&lists, query, args...); err != nil {
+		return err
+	}
+	if len(lists) >= 1 {
+		for k, v := range lists[0] {
+			if v != nil {
+				res.Set(k, interface2String(v))
+			}
+		}
 	}
 	return nil
 }
