@@ -1,0 +1,19 @@
+{
+	"current_table":"tmain",
+	"current_key":"id",
+	"insert_pars":["username"],
+	"profile_table":{
+		"current_table":"tprofile",
+		"current_key":"ts",
+		"foreign_key":"id",
+		"insert_pars":["id","username","passwd","firstname","lastname","gender","street","city","province","phone","email"],
+		"edit_pars":  ["ts","id","username",    "firstname","lastname","gender","street","city","province","phone","email"],
+		"topics_pars":["ts","id","username",    "firstname","lastname"]
+	},
+	"status_table":{
+		"current_table":"tstatus",
+		"current_key":"ts",
+		"foreign_key":"id",
+		"insert_pars":["id","status"]
+	}
+}
