@@ -1,12 +1,21 @@
 {
-	"crud": {
-    	"current_table": "atesting",
-    	"current_key" : "id"
-	},
-    "insupd_pars" : ["x","y"],
-    "insert_pars" : ["x","y","z"],
-    "edit_pars" : ["x","y","z","id"],
-    "topics_pars" : ["id","x","y","z"],
+	"current_table":"atesting",
+	"current_key":"id",
+	"insert_pars":["x","y"],
+	"profile_table":{
+		"current_table":"at_profile",
+        "current_key":"ts",
+        "foreign_key":"id",
+        "insert_pars":["id","x","y","z"],
+        "edit_pars":  ["id","x","y","z"],
+        "topics_pars":["id","x","y","z"]
+    },
+	"status_table":{
+        "current_table":"at_status",
+        "current_key":"ts",
+        "foreign_key":"id",
+        "insert_pars":["id","status"]
+    },
 
 	"nextpages" : {
         "topics" : [

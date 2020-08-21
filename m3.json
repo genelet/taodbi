@@ -1,9 +1,18 @@
 {
-    "crud": {
-        "current_table": "testing",
-        "current_key" : "tid"
+    "current_table":"testing",
+    "current_key":"tid",
+    "profile_table":{
+        "current_table":"t_profile",
+        "current_key":"ts",
+        "foreign_key":"tid",
+        "insert_pars":["tid","child","id"],
+        "edit_pars":  ["tid","child","id"],
+        "topics_pars":["tid","child","id"]
     },
-    "insert_pars" : ["id","child"],
-    "edit_pars"   : ["tid","child","id"],
-    "topics_pars" : ["tid","child","id"]
+    "status_table":{
+        "current_table":"t_status",
+        "current_key":"ts",
+        "foreign_key":"tid",
+        "insert_pars":["tid","status"]
+    }
 }

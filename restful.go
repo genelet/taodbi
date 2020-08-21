@@ -17,6 +17,18 @@ type Restful struct {
 }
 
 func newRestful(db *sql.DB, filename string) (*Restful, error) {
+	parsed, err := newRest(filename)
+    if err != nil { return nil, err }
+	if db!=nil {
+		parsed.Crud.DB = db
+		parsed.ProfileTable.DB = db
+		parsed.StatusTable.DB = db
+	}
+
+    return parsed, nil
+}
+
+func newRest(filename string) (*Restful, error) {
 	content, err := ioutil.ReadFile(filename)
     if err != nil { return nil, err }
     var parsed *Restful
@@ -24,11 +36,8 @@ func newRestful(db *sql.DB, filename string) (*Restful, error) {
         return nil, err
     }
     parsed.Crud.fulfill()
-    parsed.Crud.DB = db
     parsed.ProfileTable.fulfill()
-    parsed.ProfileTable.DB = db
     parsed.StatusTable.fulfill()
-    parsed.StatusTable.DB = db
 
     return parsed, nil
 }
@@ -45,33 +54,42 @@ func (self *Restful) getStatus(id interface{}) (bool, error) {
 // The keys are column names, and their values are columns' values.
 //
 func (self *Restful) insertRest(args map[string]interface{}) error {
-	extra := make(map[string]interface{})
-	for _, k := range self.InsertPars {
-		v, ok := args[k]
-		if !ok {
-			return errors.New("missing unique key: " + k)
-		}
-		extra[k] = v
-	}
-
 	var id interface{}
+	extra := make(map[string]interface{})
 
-	lists := make([]map[string]interface{}, 0)
-	if err := self.topicsHash(&lists, self.CurrentKey, "", extra); err != nil {
-		return err
-	}
-	if len(lists)>0 {
-		id = lists[0][self.CurrentKey]
-		if status, err := self.getStatus(id); err != nil {
-			return err
-		} else if status {
-			return errors.New("current unique key already taken")
+	if hasValue(self.InsertPars) {
+		for _, k := range self.InsertPars {
+			v, ok := args[k]
+			if !ok {
+				return errors.New("missing unique key: " + k)
+			}
+			extra[k] = v
 		}
-		self.LastID = id.(int64)
-	} else if err := self.insertHash(extra); err != nil {
-		return err
+
+		lists := make([]map[string]interface{}, 0)
+		if err := self.topicsHash(&lists, self.CurrentKey, "", extra); err != nil {
+			return err
+		}
+		if len(lists)>0 {
+			id = lists[0][self.CurrentKey]
+			if status, err := self.getStatus(id); err != nil {
+				return err
+			} else if status {
+				return errors.New("current unique key already taken")
+			}
+			self.LastID = id.(int64)
+		} else if err := self.insertHash(extra); err != nil {
+			return err
+		} else {
+			id = self.LastID
+		}
 	} else {
-		id = self.LastID
+		extra["useless"] = false
+		if err := self.insertHash(extra); err != nil {
+			return err
+		} else {
+			id = self.LastID
+		}
 	}
 
 	p := self.ProfileTable
@@ -184,7 +202,7 @@ func (self *Restful) editRest(lists *[]map[string]interface{}, editPars interfac
 	return p.editHashFK(lists, editPars, ids, extra...)
 }
 
-func (self *Restful) getPlainLists(lastID interface{}, rowcount int, reverse bool) ([]interface{}, error) {
+func (self *Restful) getPlainLists(passid interface{}, rowcount int, reverse bool) ([]interface{}, error) {
 	gsql := self.CurrentKey
 	order := "ORDER BY " + self.CurrentKey
 	if reverse {
@@ -193,7 +211,7 @@ func (self *Restful) getPlainLists(lastID interface{}, rowcount int, reverse boo
 	} else {
 		gsql += ">"
 	}
-	gsql += fmt.Sprintf("%d", lastID)
+	gsql += fmt.Sprintf("%d", passid)
 	order += " LIMIT " + fmt.Sprintf("%d", rowcount)
 	lists := make([]map[string]interface{},0)
 	if err := self.topicsHash(&lists, self.CurrentKey, order, map[string]interface{}{"_gsql":gsql}); err != nil {
@@ -216,7 +234,7 @@ func (self *Restful) getPlainLists(lastID interface{}, rowcount int, reverse boo
 // 3) map[string]string{name: label} - column name is mapped to label
 // 4) map[string][2]string{name: label, type} -- column name to label and data type
 //
-func (self *Restful) topicsRest(rowcount int, reverse bool, lastID interface{}, lists *[]map[string]interface{}, selectPars interface{}, extra ...map[string]interface{}) error {
+func (self *Restful) topicsRest(rowcount int, reverse bool, passid interface{}, lists *[]map[string]interface{}, selectPars interface{}, extra ...map[string]interface{}) error {
 	if rowcount < 1 {
 		return errors.New("no row counts")
 	}
@@ -225,15 +243,16 @@ func (self *Restful) topicsRest(rowcount int, reverse bool, lastID interface{}, 
 		return err
 	}
 
+	ignore := passid
 	count := 0
 	total := 0
 	for {
-		ids, err := self.getPlainLists(lastID, rowcount, reverse)
+		ids, err := self.getPlainLists(ignore, rowcount, reverse)
 		if err != nil { return err }
 		nMain := len(ids)
-		if nMain == 0 { return nil }
+		if nMain == 0 { return nil } // no record left in main
 		count += nMain
-		lastID = ids[nMain-1]
+		ignore = ids[nMain-1]
 
 		outs := make([]interface{}, 0)
 		for _, id := range ids {
@@ -255,12 +274,11 @@ func (self *Restful) topicsRest(rowcount int, reverse bool, lastID interface{}, 
 		for _, item := range items {
 			*lists = append(*lists, item)
 			total++
-			if total >= rowcount {
+			if total >= rowcount { // rowcount of records found
 				return nil
 			}
 		}
 
-		if nMain < rowcount { return nil }
 		count += nMain
 		if count >= countTable { return nil }
 	}
