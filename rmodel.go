@@ -135,17 +135,6 @@ func (self *Rmodel) getFv(pars []string) map[string]interface{} {
 	return fieldValues
 }
 
-func (self *Rmodel) getFvWithoutFK(pars []string) map[string]interface{} {
-	ARGS := self.aARGS
-	fieldValues := make(map[string]interface{})
-	for _, f := range self.filteredFields(pars) {
-		if v, ok := ARGS[f]; ok {
-			fieldValues[f] = v
-		}
-	}
-	return fieldValues
-}
-
 func (self *Rmodel) editIdVal(extra ...map[string]interface{}) []interface{} {
 	if hasValue(extra) {
 		return []interface{}{self.properValue(self.CurrentKey, extra[0])}

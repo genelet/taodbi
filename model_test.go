@@ -13,18 +13,18 @@ func TestModel(t *testing.T) {
     c := newconf("config.json")
     db, err := sql.Open(c.Db_type, c.Dsn_2)
     if err != nil { panic(err) }
-	model, err := NewModel(getString("m1.json"))
+	model, err := NewModel("m1.json")
     if err != nil { panic(err) }
-	model.Db = db
+	model.SetDB(db)
 
-	err = model.ExecSQL(`drop table if exists atesting`)
+	err = model.DoSQL(`drop table if exists atesting`)
 	if err != nil { panic(err) }
-	err = model.ExecSQL(`CREATE TABLE atesting (id timestamp, x binary(8), y binary(8), z binary(8))`)
+	err = model.DoSQL(`CREATE TABLE atesting (id timestamp, x binary(8), y binary(8), z binary(8))`)
 	if err != nil { panic(err) }
 
 	//id := time.Now().UnixNano() / int64(time.Millisecond)
 	hash := map[string]interface{}{"x":"a1234567","y":"b1234567"}
-	model.ARGS = hash
+	model.SetArgs(hash)
 	err = model.Insert()
 	if err != nil { panic(err) }
 
@@ -32,11 +32,11 @@ func TestModel(t *testing.T) {
 		t.Errorf("%d wanted", model.Affected)
 	}
 	hash = map[string]interface{}{"x":"c1234567","y":"d1234567","z":"e1234"}
-	model.ARGS = hash
+	model.SetArgs(hash)
 	err = model.Insert()
 	if err != nil { panic(err) }
 	hash = map[string]interface{}{"x":"f1234567","y":"g1234567","z":"e1234"}
-	model.ARGS = hash
+	model.SetArgs(hash)
 	err = model.Insert()
 	if err != nil { panic(err) }
 
@@ -88,7 +88,7 @@ id := lists[1]["id"].(int64)
 t1 := time.Now()
 for i:=0; i<10000; i++ {
 	hash = map[string]interface{}{"id":id}
-	model.ARGS = hash
+	model.SetArgs(hash)
 	err = model.Edit()
 	if err != nil { panic(err) }
     lists = model.LISTS
@@ -120,36 +120,32 @@ func TestPagination(t *testing.T) {
     if err != nil { panic(err) }
 	model, err := NewModel(getString("m1.json"))
     if err != nil { panic(err) }
-	model.Db = db
-	model.ARGS  = make(map[string]interface{})
+	model.SetDb(db)
 	model.OTHER = make(map[string]interface{})
 
-	err = model.ExecSQL(`drop table if exists atesting`)
+	err = model.DoSQL(`drop table if exists atesting`)
 	if err != nil { panic(err) }
-	err = model.ExecSQL(`CREATE TABLE atesting (id timestamp, x binary(8), y binary(8), z binary(8))`)
+	err = model.DoSQL(`CREATE TABLE atesting (id timestamp, x binary(8), y binary(8), z binary(8))`)
 	if err != nil { panic(err) }
 
-	str, err := model.OrderString()
-    if err != nil { panic(err) }
+	str := model.orderString()
 	if str != "id" {
 		t.Errorf("id expected, got %s", str)
 	}
-	model.ARGS  = map[string]interface{}{"sortreverse":1, "rowcount":20}
-	str, err = model.OrderString()
-    if err != nil { panic(err) }
+	model.SetArgs(map[string]interface{}{"sortreverse":1, "rowcount":20})
+	str = model.orderString()
 	if str != "id DESC LIMIT 20 OFFSET 0" {
 		t.Errorf("'id DESC LIMIT 20 OFFSET 0' expected, got %s", str)
 	}
-	model.ARGS  = map[string]interface{}{"sortreverse":1, "rowcount":20, "pageno":5}
-	str, err = model.OrderString()
-    if err != nil { panic(err) }
+	model.SetArgs(map[string]interface{}{"sortreverse":1, "rowcount":20, "pageno":5})
+	str = model.orderString()
 	if str != "id DESC LIMIT 20 OFFSET 80" {
 		t.Errorf("'id DESC LIMIT 20 OFFSET 80' expected, got %s", str)
 	}
 
-	err = model.ExecSQL(`drop table if exists atesting`)
+	err = model.DoSQL(`drop table if exists atesting`)
 	if err != nil { panic(err) }
-	err = model.ExecSQL(`CREATE TABLE atesting (id timestamp, x binary(8), y binary(8), z binary(8))`)
+	err = model.DoSQL(`CREATE TABLE atesting (id timestamp, x binary(8), y binary(8), z binary(8))`)
 	if err != nil { panic(err) }
 
 	//id := time.Now().UnixNano() / int64(time.Millisecond)
@@ -158,11 +154,11 @@ func TestPagination(t *testing.T) {
 		r := strconv.Itoa(int(rand.Int31()))
 		if len(r)>8 { r=r[0:8] }
 		hash["z"] = r
-		model.ARGS = hash
+		model.SetArgs(hash)
 		err = model.Insert()
 		if err != nil { panic(err) }
 	}
-	model.ARGS = map[string]interface{}{"rowcount":20}
+	model.SetArgs(map[string]interface{}{"rowcount":20})
 	err = model.Topics()
 	if err != nil { panic(err) }
     lists := model.LISTS
@@ -170,9 +166,8 @@ func TestPagination(t *testing.T) {
 		t.Errorf("%d records returned from topics", len(lists))
 	}
 
-	model.ARGS  = map[string]interface{}{"sortreverse":1, "rowcount":20, "pageno":5}
-	str, err = model.OrderString()
-    if err != nil { panic(err) }
+	model.SetArgs(map[string]interface{}{"sortreverse":1, "rowcount":20, "pageno":5})
+	str = model.orderString()
 	if str != "id DESC LIMIT 20 OFFSET 80" {
 		t.Errorf("'id DESC LIMIT 20 OFFSET 80' expected, got %s", str)
 	}
@@ -187,37 +182,35 @@ func TestUInsupd(t *testing.T) {
     c := newconf("config.json")
     db, err := sql.Open(c.Db_type, c.Dsn_2)
     if err != nil { panic(err) }
-    model, err := NewModel(getString("m1.json"))
+    model, err := NewModel("m1.json")
     if err != nil { panic(err) }
-    model.Db = db
-    model.ARGS  = make(map[string]interface{})
-    model.OTHER = make(map[string]interface{})
+    model.SetDB(db)
 
-	err = model.ExecSQL(`drop table if exists atesting`)
+	err = model.DoSQL(`drop table if exists atesting`)
 	if err != nil { panic(err) }
-	err = model.ExecSQL(`CREATE TABLE atesting (id timestamp, x binary(8), y binary(8), z binary(8))`)
+	err = model.DoSQL(`CREATE TABLE atesting (id timestamp, x binary(8), y binary(8), z binary(8))`)
 	if err != nil { panic(err) }
 
     hash := map[string]interface{}{"x":"a1234567","y":"b1234567"}
-    model.ARGS = hash
+    model.SetArgs(hash)
     err = model.Insupd()
     if err != nil { panic(err) }
 	id := model.CurrentRow["id"].(int64)
 
     hash = map[string]interface{}{"x":"c1234567","y":"d1234567","z":"e1234"}
-    model.ARGS = hash
+	model.SetArgs(hash)
     err = model.Insupd()
     if err != nil { panic(err) }
 
     hash = map[string]interface{}{"x":"a1234567","y":"b1234567","z":"e1234"}
-    model.ARGS = hash
+	model.SetArgs(hash)
     err = model.Insupd()
     if err != nil { panic(err) }
 	if model.CurrentRow["id"].(int64) != id {
 		t.Errorf("%#v", model.CurrentRow)
 	}
 
-	model.ARGS  = make(map[string]interface{})
+	model.SetArgs(make(map[string]interface{}))
 	err = model.Topics()
     if err != nil { panic(err) }
 	lists := model.LISTS

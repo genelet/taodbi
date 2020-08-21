@@ -70,11 +70,11 @@ type Table struct {
 	Empties     string `json:"empties,omitempty"`
 	Fields      string `json:"fields,omitempty"`
 	//Maxpageno   string `json:"maxpageno,omitempty"`
-	//Totalno     string `json:"totalno,omitempty"`
+	Totalno     string `json:"totalno,omitempty"`
 	Rowcount    string `json:"rawcount,omitempty"`
-	//Pageno      string `json:"pageno,omitempty"`
+	Pageno      string `json:"pageno,omitempty"`
 	Sortreverse string `json:"sortreverse,omitempty"`
-	//Sortby      string `json:"sortby,omitempty"`
+	Sortby      string `json:"sortby,omitempty"`
 	Passid      string `json:"passid,omitempty"`
 }
 
@@ -138,8 +138,17 @@ func (parsed *Table) fulfill() {
 	parsed.topicsHashPars = generalHashPars(parsed.TopicsHash, parsed.TopicsPars, nil)
 	parsed.editHashPars   = generalHashPars(parsed.EditHash, parsed.EditPars, nil)
 
+	if parsed.Sortby == "" {
+		parsed.Sortby = "sortby"
+	}
 	if parsed.Sortreverse == "" {
 		parsed.Sortreverse = "sortreverse"
+	}
+	if parsed.Totalno == "" {
+		parsed.Totalno = "totalno"
+	}
+	if parsed.Pageno == "" {
+		parsed.Pageno = "pageno"
 	}
 	if parsed.Rowcount == "" {
 		parsed.Rowcount = "rowcount"
