@@ -3,6 +3,7 @@ package taodbi
 import (
 	"errors"
 	"strings"
+	"fmt"
 )
 
 // Crud works on one table's CRUD or RESTful operations:
@@ -30,8 +31,14 @@ func (self *Crud) insertHash(args map[string]interface{}) error {
             if !ok {
                 return errors.New("missing tag: " + t)
             }
-            table += "_" + v.(string)
-            using += Quote(v).(string) + ","
+			switch u := v.(type) {
+			case int:
+				table += fmt.Sprintf("_%d", u)
+				using += Quote(fmt.Sprintf("_%d", u)).(string) + ","
+			default:
+				table += "_" + v.(string)
+				using += Quote(v).(string) + ","
+			}
             delete(args, t)
         }
         sql += table + " USING " + self.CurrentTable + " TAGS (" + using[:len(using)-1] + ") "

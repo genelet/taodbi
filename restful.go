@@ -6,32 +6,24 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
-type Restful struct {
-	Crud
+type Rmodel struct {
+	Model
 
 	ProfileTable *Crud    `json:"profile_table,omitempty"` // non unique fields
 	StatusTable  *Crud    `json:"status_table,omitempty"`  // gmark_delete
-	Updated      bool     `json:"-"`                       // for main
 }
 
-func newRestful(db *sql.DB, filename string) (*Restful, error) {
-	parsed, err := newRest(filename)
-    if err != nil { return nil, err }
-	if db!=nil {
-		parsed.Crud.DB = db
-		parsed.ProfileTable.DB = db
-		parsed.StatusTable.DB = db
-	}
-
-    return parsed, nil
-}
-
-func newRest(filename string) (*Restful, error) {
+// NewRmodel creates a new Rmodel struct from json file 'filename'
+// You should use SetDB to assign a database handle and
+// SetArgs to set input data, a url.Value, to make it working
+//
+func NewRmodel(filename string) (*Rmodel, error) {
 	content, err := ioutil.ReadFile(filename)
     if err != nil { return nil, err }
-    var parsed *Restful
+    var parsed *Rmodel
 	if err := json.Unmarshal(content, &parsed); err != nil {
         return nil, err
     }
@@ -42,7 +34,14 @@ func newRest(filename string) (*Restful, error) {
     return parsed, nil
 }
 
-func (self *Restful) getStatus(id interface{}) (bool, error) {
+// SetDB sets the DB handle
+func (self *Rmodel) SetDB(db *sql.DB) {
+    self.Model.SetDB(db)
+    self.ProfileTable.DB = db
+    self.StatusTable.DB = db
+}
+
+func (self *Rmodel) getStatus(id interface{}) (bool, error) {
 	s := self.StatusTable
 	status := false
 	err := self.DB.QueryRow("SELECT LAST("+s.statusColumn()+") FROM "+s.CurrentTable+" WHERE "+s.ForeignKey+"=?", id).Scan(&status)
@@ -53,7 +52,7 @@ func (self *Restful) getStatus(id interface{}) (bool, error) {
 // args: the input row data expressed as url.Values.
 // The keys are column names, and their values are columns' values.
 //
-func (self *Restful) insertRest(args map[string]interface{}) error {
+func (self *Rmodel) insertRest(args map[string]interface{}) error {
 	var id interface{}
 	extra := make(map[string]interface{})
 
@@ -112,7 +111,7 @@ func (self *Restful) insertRest(args map[string]interface{}) error {
 // ids: FK's value, either a single value or array of values.
 // extra: optional, extra constraints put on row's WHERE statement.
 //
-func (self *Restful) updateRest(args map[string]interface{}, ids []interface{}, empties []string, extra ...map[string]interface{}) error {
+func (self *Rmodel) updateRest(args map[string]interface{}, ids []interface{}, empties []string, extra ...map[string]interface{}) error {
 	lists := make([]map[string]interface{}, 0)
 	p := self.ProfileTable
 	if err := p.editHashFK(&lists, p.InsertPars, ids, extra...); err != nil {
@@ -139,7 +138,7 @@ func (self *Restful) updateRest(args map[string]interface{}, ids []interface{}, 
 
 // deleteRest deletes rows by extra: constraints on WHERE statement.
 //
-func (self *Restful) deleteRest(ids []interface{}, extra ...map[string]interface{}) error {
+func (self *Rmodel) deleteRest(ids []interface{}, extra ...map[string]interface{}) error {
 	lists := make([]map[string]interface{}, 0)
 	p := self.ProfileTable
 	if err := p.editHashFK(&lists, p.ForeignKey, ids, extra...); err != nil {
@@ -157,7 +156,7 @@ func (self *Restful) deleteRest(ids []interface{}, extra ...map[string]interface
 // insupdRest updates if it is found to exists, or to inserts a new record
 // args: row's column names and values
 //
-func (self *Restful) insupdRest(args map[string]interface{}) error {
+func (self *Rmodel) insupdRest(args map[string]interface{}) error {
 	extra := make(map[string]interface{})
 	for _, k := range self.InsertPars {
 		v, ok := args[k]
@@ -197,12 +196,12 @@ func (self *Restful) insupdRest(args map[string]interface{}) error {
 // editRest selects rows using PK ids, constrained by extra
 // Only will columns defined in select_pars will be returned.
 //
-func (self *Restful) editRest(lists *[]map[string]interface{}, editPars interface{}, ids []interface{}, extra ...map[string]interface{}) error {
+func (self *Rmodel) editRest(lists *[]map[string]interface{}, editPars interface{}, ids []interface{}, extra ...map[string]interface{}) error {
 	p := self.ProfileTable
 	return p.editHashFK(lists, editPars, ids, extra...)
 }
 
-func (self *Restful) getPlainLists(passid interface{}, rowcount int, reverse bool) ([]interface{}, error) {
+func (self *Rmodel) getPlainLists(passid interface{}, rowcount int, reverse bool) ([]interface{}, error) {
 	gsql := self.CurrentKey
 	order := "ORDER BY " + self.CurrentKey
 	if reverse {
@@ -234,7 +233,7 @@ func (self *Restful) getPlainLists(passid interface{}, rowcount int, reverse boo
 // 3) map[string]string{name: label} - column name is mapped to label
 // 4) map[string][2]string{name: label, type} -- column name to label and data type
 //
-func (self *Restful) topicsRest(rowcount int, reverse bool, passid interface{}, lists *[]map[string]interface{}, selectPars interface{}, extra ...map[string]interface{}) error {
+func (self *Rmodel) topicsRest(rowcount int, reverse bool, passid interface{}, lists *[]map[string]interface{}, selectPars interface{}, extra ...map[string]interface{}) error {
 	if rowcount < 1 {
 		return errors.New("no row counts")
 	}
@@ -290,7 +289,7 @@ func (self *Restful) topicsRest(rowcount int, reverse bool, passid interface{}, 
 // This function is used for pagination.
 // extra: optional, extra constraints on WHERE statement.
 //
-func (self *Restful) totalRest(start, end, v, n *int64) error {
+func (self *Rmodel) totalRest(start, end, v, n *int64) error {
 	query := "SELECT "+self.CurrentKey+" FROM " + self.CurrentTable
 	sth, err := self.DB.Prepare(query)
 	if err != nil {
@@ -340,3 +339,158 @@ func (self *Restful) totalRest(start, end, v, n *int64) error {
 	return nil
 }
 
+
+// ...................
+//
+func (self *Rmodel) Topics(extra ...map[string]interface{}) error {
+	ARGS := self.aARGS
+	// totalForce := self.TotalForce // 0 means no total calculation
+	rowcount := 100
+	if v, ok := ARGS[self.Rowcount]; ok {
+		rowcount = v.(int)
+	}
+	reverse := false
+	if _, ok := ARGS[self.Sortreverse]; ok {
+		reverse = true
+	}
+	passid := int64(0)
+	if v, ok := ARGS[self.Passid]; ok {
+		passid = v.(int64)
+	} else if reverse {
+		passid = time.Now().UnixNano() / int64(time.Microsecond)
+	}
+
+	p := self.ProfileTable
+	hashPars := p.topicsHashPars
+    if fields, ok := self.aARGS[self.Fields]; ok {
+        hashPars = generalHashPars(p.TopicsHash, p.TopicsPars, fields.([]string))
+    }
+
+	self.aLISTS = make([]map[string]interface{}, 0)
+	return self.topicsRest(rowcount, reverse, passid, &self.aLISTS, hashPars, extra...)
+}
+
+// Edit selects few rows (usually one) using primary key value in ARGS,
+// optionally with restrictions defined in 'extra'.
+func (self *Rmodel) Edit(extra ...map[string]interface{}) error {
+	val := self.editIdVal(extra...)
+	if !hasValue(val) {
+		return errors.New("pk value not provided")
+	}
+
+	p := self.ProfileTable
+	hashPars := p.editHashPars
+    if fields, ok := self.aARGS[self.Fields]; ok {
+        hashPars = generalHashPars(p.EditHash, p.EditPars, fields.([]string))
+    }
+
+	self.aLISTS = make([]map[string]interface{}, 0)
+	return self.editRest(&self.aLISTS, hashPars, val, extra...)
+}
+
+// Insert inserts a row using data passed in ARGS. Any value defined
+// in 'extra' will override that in ARGS and be used for that column.
+func (self *Rmodel) Insert(extra ...map[string]interface{}) error {
+	p := self.ProfileTable
+	fieldValues := self.getFv(p.InsertPars)
+	if hasValue(extra) {
+		for key, value := range extra[0] {
+			if grep(p.InsertPars, key) {
+				fieldValues[key] = value
+			}
+		}
+	}
+	if !hasValue(fieldValues) {
+		return errors.New("no data to insert")
+	}
+
+	self.aLISTS = make([]map[string]interface{}, 0)
+	if err := self.insertRest(fieldValues); err != nil {
+		return err
+	}
+
+	fieldValues[self.CurrentKey] = self.LastID
+	self.aARGS[self.CurrentKey] = self.LastID
+	self.aLISTS = append(self.aLISTS, fieldValues)
+
+	return nil
+}
+
+// Insupd inserts a new row if it does not exist, or retrieves the old one,
+// depending on the unique of the columns defined in InsupdPars.
+func (self *Rmodel) Insupd(extra ...map[string]interface{}) error {
+	p := self.ProfileTable
+	fieldValues := self.getFv(p.InsertPars)
+	if hasValue(extra) {
+		for key, value := range extra[0] {
+			if grep(p.InsertPars, key) {
+				fieldValues[key] = value
+			}
+		}
+	}
+	if !hasValue(fieldValues) {
+		return errors.New("pk value not found")
+	}
+
+	if err := self.insupdRest(fieldValues); err != nil {
+		return err
+	}
+
+	fieldValues[self.CurrentKey] = self.LastID
+	self.aLISTS = append(self.aLISTS, fieldValues)
+
+	return nil
+}
+
+// Update updates a row using values defined in ARGS
+// depending on the unique of the columns defined in UpdatePars.
+// extra is for SQL constrains
+func (self *Rmodel) Update(extra ...map[string]interface{}) error {
+	val := self.editIdVal(extra...)
+	if !hasValue(val) {
+		return errors.New("pk value not found")
+	}
+
+	p := self.ProfileTable
+	fieldValues := self.getFv(p.InsertPars)
+	if !hasValue(fieldValues) {
+		return errors.New("no data to update")
+	} else if len(fieldValues) == 1 && fieldValues[self.CurrentKey] != nil {
+		self.aLISTS = append(self.aLISTS, fieldValues)
+		return nil
+	}
+
+	if hasValue(self.Empties) && hasValue(self.aARGS[self.Empties]) {
+		if err := self.updateRest(fieldValues, val, self.aARGS[self.Empties].([]string), extra...); err != nil {
+			return err
+		}
+	} else if err := self.updateRest(fieldValues, val, nil, extra...); err != nil {
+		return err
+	}
+
+	self.aLISTS = append(self.aLISTS, fieldValues)
+
+	return nil
+}
+
+// Delete deletes a row or multiple rows using the contraint in extra
+func (self *Rmodel) Delete(extra ...map[string]interface{}) error {
+	val := self.editIdVal(extra...)
+	if !hasValue(val) {
+		return errors.New("pk value not provided")
+	}
+	if err := self.deleteRest(val, extra...); err != nil {
+		return err
+	}
+
+	fieldValues := make(map[string]interface{})
+	if hasValue(extra) {
+		for k, v := range extra[0] {
+			fieldValues[k] = v
+		}
+	}
+	fieldValues[self.CurrentKey] = self.LastID
+	self.aLISTS = append(self.aLISTS, fieldValues)
+
+	return nil
+}

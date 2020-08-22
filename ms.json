@@ -1,10 +1,8 @@
 {
-	"crud": {
-    	"current_key" : "id",
-    	"current_table": "stesting",
-		"foreign_key": "x",
-		"tags": ["pubid", "location"]
-	},
+    "current_key" : "id",
+    "current_table": "stesting",
+	"foreign_key": "x",
+	"tags": ["pubid", "location"],
     "insupd_pars" : [     "x","y"],
     "insert_pars" : [     "x","y","z", "pubid", "location"],
     "edit_pars"   : ["id","x","y","z", "pubid", "location"],
