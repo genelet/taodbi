@@ -26,8 +26,8 @@ func TestRestfulNew(t *testing.T) {
 	rest, err := NewRmodel("rest.json")
 	if err != nil { t.Fatal(err) }
 	rest.SetDB(db)
-	if rest.Crud.Table.CurrentTable != "tmain" {
-		t.Errorf("%v", rest.Crud)
+	if rest.crud.Table.CurrentTable != "tmain" {
+		t.Errorf("%v", rest.crud)
 	}
 	if rest.ProfileTable.CurrentTable != "tprofile" {
 		t.Errorf("%#v", rest.ProfileTable)
@@ -130,8 +130,8 @@ func TestRmodel(t *testing.T) {
     if err != nil { t.Fatal(err) }
 	model.SetDB(db)
 
-    if model.Crud.Table.CurrentTable != "tmain" {
-        t.Errorf("%v", model.Crud)
+    if model.crud.Table.CurrentTable != "tmain" {
+        t.Errorf("%v", model.crud)
     }
     if model.ProfileTable.CurrentTable != "tprofile" {
         t.Errorf("%#v", model.ProfileTable)

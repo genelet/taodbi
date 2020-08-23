@@ -23,7 +23,7 @@ func TestCrudDb(t *testing.T) {
 		panic(err)
 	}
 	dbi := DBI{DB: db}
-	crud := &Crud{DBI: dbi, Table:Table{CurrentTable: "atesting", CurrentKey: "id"}}
+	crud := &crud{DBI: dbi, Table:Table{CurrentTable: "atesting", CurrentKey: "id"}}
 
 	err = crud.DoSQL(`create database if not exists demodb precision "us"`)
 	if err != nil {
@@ -138,7 +138,7 @@ func TestCrudEditFK(t *testing.T) {
     defer db.Close()
 
     dbi := DBI{DB: db}
-    crud := &Crud{DBI: dbi, Table:Table{CurrentTable: "tmain", CurrentKey: "id", ForeignKey: "x", InsertPars: []string{"x","y"}}}
+    crud := &crud{DBI: dbi, Table:Table{CurrentTable: "tmain", CurrentKey: "id", ForeignKey: "x", InsertPars: []string{"x","y"}}}
     err = crud.DoSQL(`create database if not exists demodb precision "us"`)
     if err != nil {
         panic(err)

@@ -35,7 +35,7 @@ type Navigate interface {
 // Model works on table's CRUD in web applications.
 //
 type Model struct {
-	Crud
+	crud
 	Navigate
 	Updated bool
 
@@ -59,7 +59,7 @@ func NewModel(filename string) (*Model, error) {
     if err := json.Unmarshal(content, &parsed); err != nil {
         return nil, err
     }
-    parsed.Crud.fulfill()
+    parsed.crud.fulfill()
 	parsed.acrud = parsed
 
     return parsed, nil
@@ -112,7 +112,7 @@ func (self *Model) getNextpages(action string) []*Page {
 
 // SetDB sets the DB handle
 func (self *Model) SetDB(db *sql.DB) {
-	self.Crud.DB = db
+	self.crud.DB = db
 	self.aLISTS = make([]map[string]interface{}, 0)
 }
 

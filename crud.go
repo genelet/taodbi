@@ -11,13 +11,13 @@ type acrud interface {
     insertExtra(map[string]interface{}) string
 }
 
-// Crud works on one table's CRUD or RESTful operations:
+// crud works on one table's CRUD or RESTful operations:
 // C: create a new row
 // R: read all rows, or read one row
 // U: update a row
 // D: delete a row
 //
-type Crud struct {
+type crud struct {
 	DBI
 	Table
 	acrud
@@ -27,11 +27,11 @@ type Crud struct {
 // args: the input row data expressed as map[string]interface{}.
 // The keys are column names, and their values are columns' values.
 //
-func (self *Crud) insertExtra(args map[string]interface{}) string {
+func (self *crud) insertExtra(args map[string]interface{}) string {
 	return ""
 }
 
-func (self *Crud) insertHash(args map[string]interface{}) error {
+func (self *crud) insertHash(args map[string]interface{}) error {
     sql := "INSERT INTO " + self.CurrentTable + self.acrud.insertExtra(args)
 
     fields := make([]string, 0)
@@ -75,7 +75,7 @@ func (self *Crud) insertHash(args map[string]interface{}) error {
 // 3) map[string]string{name: label} - column name is mapped to label
 // 4) map[string][2]string{name: label, type} -- column name to label and data type
 //
-func (self *Crud) editHash(lists *[]map[string]interface{}, editPars interface{}, ids []interface{}, extra ...map[string]interface{}) error {
+func (self *crud) editHash(lists *[]map[string]interface{}, editPars interface{}, ids []interface{}, extra ...map[string]interface{}) error {
 	sql, labels, types := selectType(editPars)
 	sql = "SELECT " + sql + "\nFROM " + self.CurrentTable
 	where, extraValues := singleCondition(self.CurrentKey, ids, extra...)
@@ -102,7 +102,7 @@ func filterExtra(keys []string, extra map[string]interface{}) map[string]interfa
     return extraNew
 }
 
-func (self *Crud) statusColumn() string {
+func (self *crud) statusColumn() string {
     for _, column := range self.InsertPars {
         if column != self.ForeignKey {
             return column
@@ -121,7 +121,7 @@ func (self *Crud) statusColumn() string {
 // 3) map[string]string{name: label} - column name is mapped to label
 // 4) map[string][2]string{name: label, type} -- column name to label and data type
 //
-func (self *Crud) editHashFK(lists *[]map[string]interface{}, editPars interface{}, ids []interface{}, extra ...map[string]interface{}) error {
+func (self *crud) editHashFK(lists *[]map[string]interface{}, editPars interface{}, ids []interface{}, extra ...map[string]interface{}) error {
     sql, labels, types := selectType(editPars)
 	for _, id := range ids {
 	    where, extraValues := singleCondition(self.ForeignKey, []interface{}{id}, extra...)
@@ -152,7 +152,7 @@ func (self *Crud) editHashFK(lists *[]map[string]interface{}, editPars interface
 // 3) map[string]string{name: label} - column name is mapped to label
 // 4) map[string][2]string{name: label, type} -- column name to label and data type
 //
-func (self *Crud) topicsHash(lists *[]map[string]interface{}, selectPars interface{}, order string, extra ...map[string]interface{}) error {
+func (self *crud) topicsHash(lists *[]map[string]interface{}, selectPars interface{}, order string, extra ...map[string]interface{}) error {
 	sql, labels, types := selectType(selectPars)
 	sql = "SELECT " + sql + "\nFROM " + self.CurrentTable
 
@@ -178,7 +178,7 @@ func (self *Crud) topicsHash(lists *[]map[string]interface{}, selectPars interfa
 // v: the total number is returned in this referenced variable
 // extra: optional, extra constraints on WHERE statement.
 //
-func (self *Crud) totalHash(v interface{}, extra ...map[string]interface{}) error {
+func (self *crud) totalHash(v interface{}, extra ...map[string]interface{}) error {
 	str := "SELECT COUNT(*) FROM\n" + self.CurrentTable
 
 	if hasValue(extra) {
