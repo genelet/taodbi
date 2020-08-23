@@ -18,7 +18,7 @@ func TestCrudFilterExtra(t *testing.T) {
 
 func TestCrudDb(t *testing.T) {
 	c := newconf("config.json")
-	db, err := sql.Open(c.Db_type, c.Dsn_2)
+	db, err := sql.Open(c.DbType, c.Dsn2)
 	if err != nil {
 		panic(err)
 	}
@@ -58,8 +58,8 @@ func TestCrudDb(t *testing.T) {
 	}
 
 	lists := make([]map[string]interface{}, 0)
-	edit_pars := []string{"id", "x", "y"}
-	err = crud.editHash(&lists, edit_pars, []interface{}{id})
+	editPars := []string{"id", "x", "y"}
+	err = crud.editHash(&lists, editPars, []interface{}{id})
 	if err != nil {
 		panic(err)
 	}
@@ -74,8 +74,8 @@ func TestCrudDb(t *testing.T) {
 	}
 
 	lists = make([]map[string]interface{}, 0)
-	select_pars := []string{"id", "x", "y"}
-	err = crud.topicsHash(&lists, select_pars, "")
+	selectPars := []string{"id", "x", "y"}
+	err = crud.topicsHash(&lists, selectPars, "")
 	if err != nil {
 		panic(err)
 	}
@@ -108,9 +108,9 @@ func TestCrudDb(t *testing.T) {
 	}
 
 	lists = make([]map[string]interface{}, 0)
-	select_pars = []string{"id", "x", "y"}
+	selectPars = []string{"id", "x", "y"}
 	extra := map[string]interface{}{"x": "a1234567"}
-	err = crud.topicsHash(&lists, select_pars, "", extra)
+	err = crud.topicsHash(&lists, selectPars, "", extra)
 	if err != nil {
 		panic(err)
 	}
@@ -132,7 +132,7 @@ func TestCrudDb(t *testing.T) {
 
 func TestCrudEditFK(t *testing.T) {
     c := newconf("config.json")
-    db, err := sql.Open(c.Db_type, c.Dsn_2)
+    db, err := sql.Open(c.DbType, c.Dsn2)
     if err != nil {
         panic(err)
     }

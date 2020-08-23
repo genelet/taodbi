@@ -337,7 +337,7 @@ If you need to call mutiple tables in one function, you need to put other model 
 ```
 // create the database handler "db"
     c := newconf("config.json")
-    db, err := sql.Open(c.Db_type, c.Dsn_2)
+    db, err := sql.Open(c.DbType, c.Dsn2)
     if err != nil { panic(err) }
     
 // create your current model named "atesting", note that we have nextpages in it 

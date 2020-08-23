@@ -2,11 +2,12 @@ package taodbi
 
 import (
 	"fmt"
-	"time"
+//	"time"
 	"net/url"
 	"strings"
 )
 
+/*
 func micro2string(v int64) string {
 	ratio := int64(time.Second) / int64(time.Microsecond)
 	t := time.Unix(int64(v/ratio), (v%ratio) * int64(time.Microsecond))
@@ -20,6 +21,7 @@ func string2micro(v string) (int64, error) {
 	if err != nil { return 0, err }
 	return t.UnixNano() / int64(time.Microsecond), nil
 }
+*/
 
 func hasValue(extra interface{}) bool {
 	if extra == nil {

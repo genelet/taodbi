@@ -1,19 +1,19 @@
 package taodbi
 
 import (
-	"errors"
-	"io/ioutil"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"time"
 )
 
 type Rmodel struct {
 	Model
 
-	ProfileTable *Model    `json:"profile_table,omitempty"` // non unique fields
-	StatusTable  *Model    `json:"status_table,omitempty"`  // gmark_delete
+	ProfileTable *Model `json:"profile_table,omitempty"` // non unique fields
+	StatusTable  *Model `json:"status_table,omitempty"`  // gmark_delete
 }
 
 // NewRmodel creates a new Rmodel struct from json file 'filename'
@@ -22,27 +22,29 @@ type Rmodel struct {
 //
 func NewRmodel(filename string) (*Rmodel, error) {
 	content, err := ioutil.ReadFile(filename)
-    if err != nil { return nil, err }
-    var parsed *Rmodel
+	if err != nil {
+		return nil, err
+	}
+	var parsed *Rmodel
 	if err := json.Unmarshal(content, &parsed); err != nil {
-        return nil, err
-    }
-    parsed.fulfill()
-    parsed.ProfileTable.fulfill()
-    parsed.StatusTable.fulfill()
+		return nil, err
+	}
+	parsed.fulfill()
+	parsed.ProfileTable.fulfill()
+	parsed.StatusTable.fulfill()
 
 	parsed.acrud = parsed
 	parsed.ProfileTable.acrud = parsed.ProfileTable
 	parsed.StatusTable.acrud = parsed.StatusTable
 
-    return parsed, nil
+	return parsed, nil
 }
 
 // SetDB sets the DB handle
 func (self *Rmodel) SetDB(db *sql.DB) {
-    self.Model.SetDB(db)
-    self.ProfileTable.DB = db
-    self.StatusTable.DB = db
+	self.Model.SetDB(db)
+	self.ProfileTable.DB = db
+	self.StatusTable.DB = db
 }
 
 func (self *Rmodel) getStatus(id interface{}) (bool, error) {
@@ -73,7 +75,7 @@ func (self *Rmodel) insertRest(args map[string]interface{}) error {
 		if err := self.topicsHash(&lists, self.CurrentKey, "", extra); err != nil {
 			return err
 		}
-		if len(lists)>0 {
+		if len(lists) > 0 {
 			id = lists[0][self.CurrentKey]
 			if status, err := self.getStatus(id); err != nil {
 				return err
@@ -90,9 +92,8 @@ func (self *Rmodel) insertRest(args map[string]interface{}) error {
 		extra["useless"] = false
 		if err := self.insertHash(extra); err != nil {
 			return err
-		} else {
-			id = self.LastID
 		}
+		id = self.LastID
 	}
 
 	p := self.ProfileTable
@@ -107,7 +108,7 @@ func (self *Rmodel) insertRest(args map[string]interface{}) error {
 		return err
 	}
 
-	return self.DoSQL("INSERT INTO " + self.StatusTable.CurrentTable + " VALUES (now, ?, true)", id)
+	return self.DoSQL("INSERT INTO "+self.StatusTable.CurrentTable+" VALUES (now, ?, true)", id)
 }
 
 // updateRest updates multiple rows using data expressed in type Values.
@@ -150,7 +151,7 @@ func (self *Rmodel) deleteRest(ids []interface{}, extra ...map[string]interface{
 	}
 	s := self.StatusTable
 	for _, item := range lists {
-		if err := self.DoSQL("INSERT INTO " + s.CurrentTable + " VALUES (now, ?, false)", item[p.ForeignKey]); err != nil {
+		if err := self.DoSQL("INSERT INTO "+s.CurrentTable+" VALUES (now, ?, false)", item[p.ForeignKey]); err != nil {
 			return err
 		}
 	}
@@ -188,7 +189,7 @@ func (self *Rmodel) insupdRest(args map[string]interface{}) error {
 			return err
 		}
 
-        args[p.ForeignKey] = id
+		args[p.ForeignKey] = id
 		// unlike insertRest, columns without values will NOT be filled with the last ones
 		return p.insertHash(args)
 	}
@@ -216,8 +217,8 @@ func (self *Rmodel) getPlainLists(passid interface{}, rowcount int, reverse bool
 	}
 	gsql += fmt.Sprintf("%d", passid)
 	order += " LIMIT " + fmt.Sprintf("%d", rowcount)
-	lists := make([]map[string]interface{},0)
-	if err := self.topicsHash(&lists, self.CurrentKey, order, map[string]interface{}{"_gsql":gsql}); err != nil {
+	lists := make([]map[string]interface{}, 0)
+	if err := self.topicsHash(&lists, self.CurrentKey, order, map[string]interface{}{"_gsql": gsql}); err != nil {
 		return nil, err
 	}
 	ids := make([]interface{}, 0)
@@ -251,9 +252,13 @@ func (self *Rmodel) topicsRest(rowcount int, reverse bool, passid interface{}, l
 	total := 0
 	for {
 		ids, err := self.getPlainLists(ignore, rowcount, reverse)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		nMain := len(ids)
-		if nMain == 0 { return nil } // no record left in main
+		if nMain == 0 {
+			return nil
+		} // no record left in main
 		count += nMain
 		ignore = ids[nMain-1]
 
@@ -265,7 +270,7 @@ func (self *Rmodel) topicsRest(rowcount int, reverse bool, passid interface{}, l
 				outs = append(outs, id)
 			}
 		}
-		if len(outs)<1 {
+		if len(outs) < 1 {
 			continue
 		}
 
@@ -283,7 +288,9 @@ func (self *Rmodel) topicsRest(rowcount int, reverse bool, passid interface{}, l
 		}
 
 		count += nMain
-		if count >= countTable { return nil }
+		if count >= countTable {
+			return nil
+		}
 	}
 
 	return nil
@@ -294,48 +301,48 @@ func (self *Rmodel) topicsRest(rowcount int, reverse bool, passid interface{}, l
 // extra: optional, extra constraints on WHERE statement.
 //
 func (self *Rmodel) totalRest(start, end, v, n *int64) error {
-	query := "SELECT "+self.CurrentKey+" FROM " + self.CurrentTable
+	query := "SELECT " + self.CurrentKey + " FROM " + self.CurrentTable
 	sth, err := self.DB.Prepare(query)
 	if err != nil {
-        return err
-    }
+		return err
+	}
 	defer sth.Close()
 
 	s := self.StatusTable
-	sta, err := self.DB.Prepare("SELECT LAST("+s.statusColumn()+") FROM "+s.CurrentTable+" WHERE "+s.ForeignKey+"=?")
+	sta, err := self.DB.Prepare("SELECT LAST(" + s.statusColumn() + ") FROM " + s.CurrentTable + " WHERE " + s.ForeignKey + "=?")
 	if err != nil {
-        return err
-    }
+		return err
+	}
 	defer sth.Close()
 
 	rows, err := sth.Query()
-    if err != nil {
-        return err
-    }
+	if err != nil {
+		return err
+	}
 	defer rows.Close()
 
 	status := false
 	id := int64(0)
-	i  := int64(0)
-	raw:= int64(0)
+	i := int64(0)
+	raw := int64(0)
 	for rows.Next() {
 		raw++
 		if err = rows.Scan(&id); err != nil {
-            return err
-        }
+			return err
+		}
 		if err := sta.QueryRow(id).Scan(&status); err != nil {
 			return err
 		}
 		if status {
-			if i==0 {
+			if i == 0 {
 				*start = id
 			}
 			i++
 		}
 	}
-    if err := rows.Err(); err != nil && err != sql.ErrNoRows {
-        return err
-    }
+	if err := rows.Err(); err != nil && err != sql.ErrNoRows {
+		return err
+	}
 
 	*end = id
 	*v = i
@@ -343,8 +350,7 @@ func (self *Rmodel) totalRest(start, end, v, n *int64) error {
 	return nil
 }
 
-
-// ...................
+// Topics selects many rows, optionally with restriction defined in 'extra'.
 //
 func (self *Rmodel) Topics(extra ...map[string]interface{}) error {
 	ARGS := self.aARGS
@@ -366,9 +372,9 @@ func (self *Rmodel) Topics(extra ...map[string]interface{}) error {
 
 	p := self.ProfileTable
 	hashPars := p.topicsHashPars
-    if fields, ok := self.aARGS[self.Fields]; ok {
-        hashPars = generalHashPars(p.TopicsHash, p.TopicsPars, fields.([]string))
-    }
+	if fields, ok := self.aARGS[self.Fields]; ok {
+		hashPars = generalHashPars(p.TopicsHash, p.TopicsPars, fields.([]string))
+	}
 
 	self.aLISTS = make([]map[string]interface{}, 0)
 	return self.topicsRest(rowcount, reverse, passid, &self.aLISTS, hashPars, extra...)
@@ -384,9 +390,9 @@ func (self *Rmodel) Edit(extra ...map[string]interface{}) error {
 
 	p := self.ProfileTable
 	hashPars := p.editHashPars
-    if fields, ok := self.aARGS[self.Fields]; ok {
-        hashPars = generalHashPars(p.EditHash, p.EditPars, fields.([]string))
-    }
+	if fields, ok := self.aARGS[self.Fields]; ok {
+		hashPars = generalHashPars(p.EditHash, p.EditPars, fields.([]string))
+	}
 
 	self.aLISTS = make([]map[string]interface{}, 0)
 	return self.editRest(&self.aLISTS, hashPars, val, extra...)

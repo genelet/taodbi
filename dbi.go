@@ -1,10 +1,10 @@
 package taodbi
 
 import (
+	"database/sql"
 	"errors"
 	"net/url"
 	"strings"
-	"database/sql"
 )
 
 // Quote escapes string to be used safely in placeholder.
@@ -29,11 +29,11 @@ func Quotes(args []interface{}) []interface{} {
 	if !hasValue(args) {
 		return nil
 	}
-	new_args := make([]interface{}, 0)
+	newArgs := make([]interface{}, 0)
 	for _, v := range args {
-		new_args = append(new_args, Quote(v))
+		newArgs = append(newArgs, Quote(v))
 	}
-	return new_args
+	return newArgs
 }
 
 // DBI simply embeds GO's generic SQL handler.
@@ -41,9 +41,9 @@ func Quotes(args []interface{}) []interface{} {
 //
 type DBI struct {
 	// Embedding the generic database handle.
-	*sql.DB	       `json:"-"`
+	*sql.DB `json:"-"`
 	// LastID: the last auto id inserted, if the database provides
-	LastID int64   `json:"-"`
+	LastID int64 `json:"-"`
 	// Affected: the number of rows affected
 	Affected int64 `json:"-"`
 }
@@ -64,18 +64,18 @@ func (self *DBI) DoSQL(query string, args ...interface{}) error {
 		return err
 	}
 
-/*
-    LastID, err := res.LastInsertId()
-    if err != nil {
-        return err
-    }
-    self.LastID = LastID
-*/
-    affected, err := res.RowsAffected()
-    if err != nil {
-        return err
-    }
-    self.Affected = affected
+	/*
+	   LastID, err := res.LastInsertId()
+	   if err != nil {
+	       return err
+	   }
+	   self.LastID = LastID
+	*/
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	self.Affected = affected
 
 	sth.Close()
 	return nil
@@ -98,15 +98,15 @@ func (self *DBI) DoSQLs(query string, args ...[]interface{}) error {
 	m := len(args[0])
 	item := "(" + strings.Join(strings.Split(strings.Repeat("?", m), ""), ",") + ")"
 	query += ""
-	new_args := make([]interface{}, 0)
+	newArgs := make([]interface{}, 0)
 	for _, item := range args[0] {
-		new_args = append(new_args, item)
+		newArgs = append(newArgs, item)
 	}
 	for i := 0; i < (n - 1); i++ {
 		query += " " + item
-		new_args = append(new_args, args[i+1]...)
+		newArgs = append(newArgs, args[i+1]...)
 	}
-	return self.DoSQL(query, new_args...)
+	return self.DoSQL(query, newArgs...)
 }
 
 // SelectSQL selects data rows as slice of maps into 'lists'.
@@ -259,10 +259,10 @@ func (self *DBI) pickup(rows *sql.Rows, lists *[]map[string]interface{}, typeLab
 					x := x[j].(*sql.NullString)
 					n := len(x.String)
 					if x.Valid {
-						if n>=2 {
+						if n >= 2 {
 							res[v] = strings.TrimRight(x.String[:n-2], "\x00")
 						} else {
-							errors.New("wrong string output: " + x.String)
+							return errors.New("wrong string output: " + x.String)
 						}
 					}
 				default:
@@ -274,18 +274,18 @@ func (self *DBI) pickup(rows *sql.Rows, lists *[]map[string]interface{}, typeLab
 					case []uint8:
 						x := string(name.([]uint8))
 						n := len(x)
-						if n>=2 {
+						if n >= 2 {
 							res[v] = strings.TrimRight(x[:n-2], "\x00")
 						} else {
-							errors.New("wrong string output: " + x)
+							return errors.New("wrong string output: " + x)
 						}
 					case string:
 						x := name.(string)
 						n := len(x)
-						if n>=2 {
+						if n >= 2 {
 							res[v] = strings.TrimRight(x[:n-2], "\x00")
 						} else {
-							errors.New("wrong string output: " + x)
+							return errors.New("wrong string output: " + x)
 						}
 					default:
 						res[v] = name

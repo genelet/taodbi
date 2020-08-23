@@ -9,7 +9,7 @@ import (
 /*
 func TestNextPages(t *testing.T) {
     c := newconf("config.json")
-    db, err := sql.Open(c.Db_type, c.Dsn_2)
+    db, err := sql.Open(c.DbType, c.Dsn2)
     if err != nil { panic(err) }
     model, err := NewSmodel(getString("m2.json"))
     if err != nil { panic(err) }
@@ -115,7 +115,7 @@ if diff > 30.0 {
 
 func TestNextPagesMore(t *testing.T) {
     c := newconf("config.json")
-    db, err := sql.Open(c.Db_type, c.Dsn_2)
+    db, err := sql.Open(c.DbType, c.Dsn2)
     if err != nil { panic(err) }
     model, err := NewSmodel(getString("m22.json")) // no relate_item, to OTHER
     if err != nil { panic(err) }
@@ -220,7 +220,7 @@ func TestNextPagesMore(t *testing.T) {
 
 func TestSmodel(t *testing.T) {
     c := newconf("config.json")
-    db, err := sql.Open(c.Db_type, c.Dsn_2)
+    db, err := sql.Open(c.DbType, c.Dsn2)
     if err != nil { panic(err) }
 
 	smodel, err := NewSmodel("ms.json")

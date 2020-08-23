@@ -7,7 +7,7 @@ import (
 
 func TestSchemaModel(t *testing.T) {
     c := newconf("config.json")
-    db, err := sql.Open(c.Db_type, c.Dsn_2)
+    db, err := sql.Open(c.DbType, c.Dsn2)
     if err != nil { panic(err) }
     model, err := NewModel("m22.json")
     if err != nil { panic(err) }
@@ -95,7 +95,7 @@ func TestSchemaModel(t *testing.T) {
 
 func TestSchema(t *testing.T) {
     c := newconf("config.json")
-    db, err := sql.Open(c.Db_type, c.Dsn_2)
+    db, err := sql.Open(c.DbType, c.Dsn2)
     if err != nil { t.Fatal(err) }
     defer db.Close()
 

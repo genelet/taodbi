@@ -19,7 +19,7 @@ func initRest(db *sql.DB) {
 
 func TestRestfulNew(t *testing.T) {
 	c := newconf("config.json")
-	db, err := sql.Open(c.Db_type, c.Dsn_2)
+	db, err := sql.Open(c.DbType, c.Dsn2)
 	if err != nil { t.Fatal(err) }
 	defer db.Close()
 
@@ -122,7 +122,7 @@ func TestRestfulNew(t *testing.T) {
 
 func TestRmodel(t *testing.T) {
 	c := newconf("config.json")
-    db, err := sql.Open(c.Db_type, c.Dsn_2)
+    db, err := sql.Open(c.DbType, c.Dsn2)
     if err != nil { t.Fatal(err) }
     defer db.Close()
 

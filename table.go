@@ -34,12 +34,12 @@ func (self *Page) refresh(item map[string]interface{}, extra map[string]interfac
 //
 type Table struct {
 	// CurrentTable: the current table name
-	CurrentTable  string    `json:"current_table,omitempty"`
+	CurrentTable string `json:"current_table,omitempty"`
 	// CurrentKey: the single primary key of the table
-	CurrentKey    string    `json:"current_key,omitempty"`
-	ForeignKey    string    `json:"foreign_key,omitempty"`
+	CurrentKey string `json:"current_key,omitempty"`
+	ForeignKey string `json:"foreign_key,omitempty"`
 	// CurrentIDAuto: if the table has an auto assigned series number
-	CurrentIDAuto string    `json:"current_id_auto,omitempty"`
+	CurrentIDAuto string `json:"current_id_auto,omitempty"`
 
 	// Table columns for Crud
 	// InsertPars: the columns used for Create
@@ -53,7 +53,7 @@ type Table struct {
 	// TopicsHash: a map between SQL columns and output keys
 	TopicsHash map[string]interface{} `json:"topics_hash,omitempty"`
 
-	editHashPars interface{}
+	editHashPars   interface{}
 	topicsHashPars interface{}
 
 	// TotalForce controls how the total number of rows be calculated for Topics
@@ -68,7 +68,6 @@ type Table struct {
 
 	Empties     string `json:"empties,omitempty"`
 	Fields      string `json:"fields,omitempty"`
-	//Maxpageno   string `json:"maxpageno,omitempty"`
 	Totalno     string `json:"totalno,omitempty"`
 	Rowcount    string `json:"rawcount,omitempty"`
 	Pageno      string `json:"pageno,omitempty"`
@@ -91,7 +90,7 @@ func generalHashPars(TopicsHash map[string]interface{}, TopicsPars []interface{}
 		s2 := make(map[string][2]string)
 		s1 := make(map[string]string)
 		for k, vs := range TopicsHash {
-			if fields != nil && len(fields)>0 && !grep(fields, k) {
+			if fields != nil && len(fields) > 0 && !grep(fields, k) {
 				continue
 			}
 			switch v := vs.(type) {
@@ -103,21 +102,20 @@ func generalHashPars(TopicsHash map[string]interface{}, TopicsPars []interface{}
 		}
 		if len(s2) > 0 {
 			return s2
-		} else {
-			return s1
 		}
+		return s1
 	} else {
-		s2 := make([][2]string,0)
-		s1 := make([]string,0)
+		s2 := make([][2]string, 0)
+		s1 := make([]string, 0)
 		for _, vs := range TopicsPars {
 			switch v := vs.(type) {
 			case []interface{}:
-				if fields != nil && len(fields)>0 && !grep(fields, v[0].(string)) {
+				if fields != nil && len(fields) > 0 && !grep(fields, v[0].(string)) {
 					continue
 				}
 				s2 = append(s2, [2]string{v[0].(string), v[1].(string)})
 			default:
-				if fields != nil && len(fields)>0 && !grep(fields, v.(string)) {
+				if fields != nil && len(fields) > 0 && !grep(fields, v.(string)) {
 					continue
 				}
 				s1 = append(s1, v.(string))
@@ -125,9 +123,8 @@ func generalHashPars(TopicsHash map[string]interface{}, TopicsPars []interface{}
 		}
 		if len(s2) > 0 {
 			return s2
-		} else {
-			return s1
 		}
+		return s1
 	}
 	return nil
 }
@@ -135,7 +132,7 @@ func generalHashPars(TopicsHash map[string]interface{}, TopicsPars []interface{}
 func (parsed *Table) fulfill() {
 	parsed.topicsHashPars = generalHashPars(parsed.TopicsHash, parsed.TopicsPars, nil)
 	parsed.topicsHashPars = generalHashPars(parsed.TopicsHash, parsed.TopicsPars, nil)
-	parsed.editHashPars   = generalHashPars(parsed.EditHash, parsed.EditPars, nil)
+	parsed.editHashPars = generalHashPars(parsed.EditHash, parsed.EditPars, nil)
 
 	if parsed.Sortby == "" {
 		parsed.Sortby = "sortby"
@@ -164,12 +161,12 @@ func (parsed *Table) fulfill() {
 }
 
 func (self *Table) statusColumn() string {
-    for _, column := range self.InsertPars {
-        if column != self.ForeignKey {
-            return column
-        }
-    }
-    return ""
+	for _, column := range self.InsertPars {
+		if column != self.ForeignKey {
+			return column
+		}
+	}
+	return ""
 }
 
 // selectType returns variables' SELECT sql string, labels and types. 4 cases of interface{}
@@ -296,7 +293,6 @@ func singleCondition(keyname string, ids []interface{}, extra ...map[string]inte
 	for _, v := range ids {
 		extraValues = append(extraValues, v)
 	}
-
 
 	if hasValue(extra) {
 		s, arr := selectCondition(extra[0])

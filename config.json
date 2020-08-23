@@ -1,5 +1,5 @@
 {
-	"db_type":"taosSql",
-	"dsn_1":"root:taosdata@/tcp(127.0.0.1:0)/",
-	"dsn_2":"root:taosdata@/tcp(127.0.0.1:0)/demodb?parseTime=false"
+	"DbType":"taosSql",
+	"Dsn1":"root:taosdata@/tcp(127.0.0.1:0)/",
+	"Dsn2":"root:taosdata@/tcp(127.0.0.1:0)/demodb?parseTime=false"
 }

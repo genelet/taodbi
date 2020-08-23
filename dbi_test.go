@@ -43,7 +43,7 @@ func TestLong(t *testing.T) {
 	c := newconf("config.json")
 
 	dbname := "demodb"
-	db, err := open(c.Dsn_1)
+	db, err := open(c.Dsn1)
 	if err != nil {
 		panic(err)
 	}
@@ -128,7 +128,7 @@ func TestLong(t *testing.T) {
 func TestShort(t *testing.T) {
 	dbname := "demodb"
 	c := newconf("config.json")
-	db, err := open(c.Dsn_1)
+	db, err := open(c.Dsn1)
 	if err != nil {
 		panic(err)
 	}
@@ -279,7 +279,7 @@ func TestShort(t *testing.T) {
 func TestInt(t *testing.T) {
 	dbname := "demodb"
 	c := newconf("config.json")
-	db, err := sql.Open(c.Db_type, c.Dsn_2)
+	db, err := sql.Open(c.DbType, c.Dsn2)
 	if err != nil {
 		panic(err)
 	}
