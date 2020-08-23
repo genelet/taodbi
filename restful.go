@@ -31,6 +31,10 @@ func NewRmodel(filename string) (*Rmodel, error) {
     parsed.ProfileTable.fulfill()
     parsed.StatusTable.fulfill()
 
+	parsed.acrud = parsed
+	parsed.ProfileTable.acrud = parsed.ProfileTable
+	parsed.StatusTable.acrud = parsed.StatusTable
+
     return parsed, nil
 }
 

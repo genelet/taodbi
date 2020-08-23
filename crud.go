@@ -1,10 +1,15 @@
 package taodbi
 
 import (
-	"errors"
 	"strings"
-	"fmt"
 )
+
+// acrud is interface to implement insertExtra
+//
+type acrud interface {
+   // insertHash inserts one row into the table.
+    insertExtra(map[string]interface{}) string
+}
 
 // Crud works on one table's CRUD or RESTful operations:
 // C: create a new row
@@ -15,34 +20,19 @@ import (
 type Crud struct {
 	DBI
 	Table
+	acrud
 }
 
 // insertHash inserts one row into the table.
 // args: the input row data expressed as map[string]interface{}.
 // The keys are column names, and their values are columns' values.
 //
+func (self *Crud) insertExtra(args map[string]interface{}) string {
+	return ""
+}
+
 func (self *Crud) insertHash(args map[string]interface{}) error {
-    sql := "INSERT INTO " + self.CurrentTable
-    if self.Tags != nil {
-        table := ""
-        using := ""
-        for _, t := range self.Tags {
-            v, ok := args[t]
-            if !ok {
-                return errors.New("missing tag: " + t)
-            }
-			switch u := v.(type) {
-			case int:
-				table += fmt.Sprintf("_%d", u)
-				using += Quote(fmt.Sprintf("_%d", u)).(string) + ","
-			default:
-				table += "_" + v.(string)
-				using += Quote(v).(string) + ","
-			}
-            delete(args, t)
-        }
-        sql += table + " USING " + self.CurrentTable + " TAGS (" + using[:len(using)-1] + ") "
-    }
+    sql := "INSERT INTO " + self.CurrentTable + self.acrud.insertExtra(args)
 
     fields := make([]string, 0)
     values := make([]interface{}, 0)

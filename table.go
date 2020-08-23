@@ -38,7 +38,6 @@ type Table struct {
 	// CurrentKey: the single primary key of the table
 	CurrentKey    string    `json:"current_key,omitempty"`
 	ForeignKey    string    `json:"foreign_key,omitempty"`
-	Tags          []string  `json:"tags,omitempty"`
 	// CurrentIDAuto: if the table has an auto assigned series number
 	CurrentIDAuto string    `json:"current_id_auto,omitempty"`
 

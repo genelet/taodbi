@@ -1,0 +1,7 @@
+{
+    "current_table":"testing",
+    "current_key":"tid",
+    "insert_pars":["tid","child","id"],
+    "edit_pars":  ["tid","child","id"],
+    "topics_pars":["tid","child","id"]
+}

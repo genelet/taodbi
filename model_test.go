@@ -42,7 +42,7 @@ func TestModel(t *testing.T) {
 
 	err = model.Topics()
 	if err != nil { panic(err) }
-    lists := model.LISTS
+    lists := model.GetLists()
 	if len(lists) !=3 {
 		t.Errorf("%d records returned from topics", len(lists))
 	}
@@ -64,7 +64,7 @@ func TestModel(t *testing.T) {
 
 	err = model.Topics(map[string]interface{}{"z":"e1234"})
 	if err != nil { panic(err) }
-    lists = model.LISTS
+    lists = model.GetLists()
 	if len(lists) !=2 {
 		t.Errorf("%d records returned from topics", len(lists))
 	}
@@ -91,7 +91,7 @@ for i:=0; i<10000; i++ {
 	model.SetArgs(hash)
 	err = model.Edit()
 	if err != nil { panic(err) }
-    lists = model.LISTS
+    lists = model.GetLists()
 	if len(lists) !=1 {
 		t.Errorf("%d records returned from topics", len(lists))
 	}
@@ -118,10 +118,9 @@ func TestPagination(t *testing.T) {
     c := newconf("config.json")
     db, err := sql.Open(c.Db_type, c.Dsn_2)
     if err != nil { panic(err) }
-	model, err := NewModel(getString("m1.json"))
+	model, err := NewModel("m1.json")
     if err != nil { panic(err) }
-	model.SetDb(db)
-	model.OTHER = make(map[string]interface{})
+	model.SetDB(db)
 
 	err = model.DoSQL(`drop table if exists atesting`)
 	if err != nil { panic(err) }
@@ -129,17 +128,17 @@ func TestPagination(t *testing.T) {
 	if err != nil { panic(err) }
 
 	str := model.orderString()
-	if str != "id" {
+	if str != "ORDER BY id" {
 		t.Errorf("id expected, got %s", str)
 	}
 	model.SetArgs(map[string]interface{}{"sortreverse":1, "rowcount":20})
 	str = model.orderString()
-	if str != "id DESC LIMIT 20 OFFSET 0" {
+	if str != "ORDER BY id DESC LIMIT 20 OFFSET 0" {
 		t.Errorf("'id DESC LIMIT 20 OFFSET 0' expected, got %s", str)
 	}
 	model.SetArgs(map[string]interface{}{"sortreverse":1, "rowcount":20, "pageno":5})
 	str = model.orderString()
-	if str != "id DESC LIMIT 20 OFFSET 80" {
+	if str != "ORDER BY id DESC LIMIT 20 OFFSET 80" {
 		t.Errorf("'id DESC LIMIT 20 OFFSET 80' expected, got %s", str)
 	}
 
@@ -161,19 +160,21 @@ func TestPagination(t *testing.T) {
 	model.SetArgs(map[string]interface{}{"rowcount":20})
 	err = model.Topics()
 	if err != nil { panic(err) }
-    lists := model.LISTS
+    lists := model.GetLists()
 	if len(lists) !=20 {
 		t.Errorf("%d records returned from topics", len(lists))
 	}
 
 	model.SetArgs(map[string]interface{}{"sortreverse":1, "rowcount":20, "pageno":5})
 	str = model.orderString()
-	if str != "id DESC LIMIT 20 OFFSET 80" {
-		t.Errorf("'id DESC LIMIT 20 OFFSET 80' expected, got %s", str)
+	if str != "ORDER BY id DESC LIMIT 20 OFFSET 80" {
+		t.Errorf("'ORDER BY id DESC LIMIT 20 OFFSET 80' expected, got %s", str)
 	}
-	if model.ARGS["totalno"].(int) != 100 || model.OTHER["totalno"].(int) != 100 {
-		t.Errorf("100 records expected, but %#v", model.ARGS)
-		t.Errorf("100 records expected, but %#v", model.OTHER)
+	err = model.Topics()
+	if err != nil { panic(err) }
+	args := model.getArgs()
+	if args["totalno"].(int) != 100 {
+		t.Errorf("100 records expected, but %#v", args)
 	}
 	db.Close()
 }
@@ -195,7 +196,7 @@ func TestUInsupd(t *testing.T) {
     model.SetArgs(hash)
     err = model.Insupd()
     if err != nil { panic(err) }
-	id := model.CurrentRow["id"].(int64)
+	id := model.LastID
 
     hash = map[string]interface{}{"x":"c1234567","y":"d1234567","z":"e1234"}
 	model.SetArgs(hash)
@@ -206,231 +207,19 @@ func TestUInsupd(t *testing.T) {
 	model.SetArgs(hash)
     err = model.Insupd()
     if err != nil { panic(err) }
-	if model.CurrentRow["id"].(int64) != id {
-		t.Errorf("%#v", model.CurrentRow)
+	if !model.Updated {
+		t.Errorf("%#v", model.Updated)
+	}
+	if model.LastID != id {
+		t.Errorf("%#v %#v", model.LastID, id)
 	}
 
 	model.SetArgs(make(map[string]interface{}))
 	err = model.Topics()
     if err != nil { panic(err) }
-	lists := model.LISTS
+	lists := model.GetLists()
 	if len(lists) != 2 {
 		t.Errorf("%#v", lists)
 	}
-	db.Close()
-}
-
-func TestNextPages(t *testing.T) {
-    c := newconf("config.json")
-    db, err := sql.Open(c.Db_type, c.Dsn_2)
-    if err != nil { panic(err) }
-    model, err := NewModel(getString("m2.json"))
-    if err != nil { panic(err) }
-    model.Db = db
-    model.ARGS  = make(map[string]interface{})
-    model.OTHER = make(map[string]interface{})
-
-	err = model.ExecSQL(`drop table if exists atesting`)
-	if err != nil { panic(err) }
-	err = model.ExecSQL(`CREATE TABLE atesting (id timestamp, x binary(8), y binary(8), z binary(8))`)
-	if err != nil { panic(err) }
-
-    hash := map[string]interface{}{"x":"a1234567","y":"b1234567"}
-    model.ARGS = hash
-    err = model.Insupd()
-    if err != nil { panic(err) }
-    id1 := model.CurrentRow["id"].(int64)
-
-    hash = map[string]interface{}{"x":"c1234567","y":"d1234567","z":"e1234"}
-    model.ARGS = hash
-    err = model.Insupd()
-    if err != nil { panic(err) }
-    id2 := model.CurrentRow["id"].(int64)
-
-    hash = map[string]interface{}{"x":"e1234567","y":"f1234567","z":"e1234"}
-    model.ARGS = hash
-    err = model.Insupd()
-    if err != nil { panic(err) }
-    id3 := model.CurrentRow["id"].(int64)
-
-
-
-	supp, err := NewModel(getString("m3.json"))
-    if err != nil { panic(err) }
-    supp.Db = db
-    supp.ARGS  = make(map[string]interface{})
-    supp.OTHER = make(map[string]interface{})
-
-    err = supp.ExecSQL(`drop table if exists testing`)
-    if err != nil { panic(err) }
-    err = supp.ExecSQL(`CREATE TABLE testing (tid timestamp, child binary(8), id bigint)`)
-    if err != nil { panic(err) }
-
-    hash = map[string]interface{}{"id":id1,"child":"john"}
-    supp.ARGS = hash
-    err = supp.Insert()
-    if err != nil { panic(err) }
-
-    hash = map[string]interface{}{"id":id1,"child":"sam"}
-    supp.ARGS = hash
-    err = supp.Insert()
-    if err != nil { panic(err) }
-
-    hash = map[string]interface{}{"id":id2,"child":"mary"}
-    supp.ARGS = hash
-    err = supp.Insert()
-    if err != nil { panic(err) }
-
-    hash = map[string]interface{}{"id":id3,"child":"kkk"}
-    supp.ARGS = hash
-    err = supp.Insert()
-    if err != nil { panic(err) }
-
-
-
-
-	st, err := NewModel(getString("m3.json"))
-    if err != nil { panic(err) }
-    st.Db = db
-    st.ARGS  = make(map[string]interface{})
-    st.OTHER = make(map[string]interface{})
-
-	storage := make(map[string]map[string]interface{})
-	storage["model"]= make(map[string]interface{})
-	storage["model"]["testing"]= st
-	storage["action"]= make(map[string]interface{})
-	tt := make(map[string]interface{})
-	tt["topics"] = func(args ...map[string]interface{}) error {
-        return st.Topics(args...)
-    }
-	storage["action"]["testing"] = tt
-
-	model.Storage = storage
-t1 := time.Now()
-for i:=0; i<10000; i++ {
-	err = model.Topics()
-    if err != nil { panic(err) }
-    lists := model.LISTS
-// []map[string]interface {}{map[string]interface {}{"id":1576360379162, "testing_topics":[]map[string]interface {}{map[string]interface {}{"child":"john", "id":1576360379162, "tid":1576360379168}, map[string]interface {}{"child":"sam", "id":1576360379162, "tid":1576360379170}}, "x":"a1234567", "y":"b1234567"}, map[string]interface {}{"id":1576360379164, "testing_topics":[]map[string]interface {}{map[string]interface {}{"child":"mary", "id":1576360379164, "tid":1576360379172}}, "x":"c1234567", "y":"d1234567", "z":"e1234"}, map[string]interface {}{"id":1576360379167, "testing_topics":[]map[string]interface {}{map[string]interface {}{"child":"kkk", "id":1576360379167, "tid":1576360379174}}, "x":"e1234567", "y":"f1234567", "z":"e1234"}}
-	list0 := lists[0]
-	relate := list0["testing_topics"].([]map[string]interface{})
-    if len(lists) != 3 ||
-		list0["x"].(string) != "a1234567" ||
-		len(relate) != 2 ||
-		relate[0]["child"].(string) != "john" {
-		t.Errorf("%#v", list0)
-		t.Errorf("%#v", relate)
-	}
-}
-t2 := time.Now()
-diff := t2.Sub(t1).Seconds()
-if diff > 30.0 {
-    t.Errorf("sould take 8 seconds but you got: %6.6f", diff)
-}
-
-	db.Close()
-}
-
-func TestNextPagesMore(t *testing.T) {
-    c := newconf("config.json")
-    db, err := sql.Open(c.Db_type, c.Dsn_2)
-    if err != nil { panic(err) }
-    model, err := NewModel(getString("m22.json")) // no relate_item, to OTHER
-    if err != nil { panic(err) }
-    model.Db = db
-    model.ARGS  = make(map[string]interface{})
-    model.OTHER = make(map[string]interface{})
-
-	err = model.ExecSQL(`drop table if exists atesting`)
-	if err != nil { panic(err) }
-	err = model.ExecSQL(`CREATE TABLE atesting (id timestamp, x binary(8), y binary(8), z binary(8))`)
-	if err != nil { panic(err) }
-
-    hash := map[string]interface{}{"x":"a1234567","y":"b1234567"}
-    model.ARGS = hash
-    err = model.Insupd()
-    if err != nil { panic(err) }
-    id1 := model.CurrentRow["id"].(int64)
-
-    hash = map[string]interface{}{"x":"c1234567","y":"d1234567","z":"e1234"}
-    model.ARGS = hash
-    err = model.Insupd()
-    if err != nil { panic(err) }
-    id2 := model.CurrentRow["id"].(int64)
-
-    hash = map[string]interface{}{"x":"e1234567","y":"f1234567","z":"e1234"}
-    model.ARGS = hash
-    err = model.Insupd()
-    if err != nil { panic(err) }
-    id3 := model.CurrentRow["id"].(int64)
-
-
-	supp, err := NewModel(getString("m3.json"))
-    if err != nil { panic(err) }
-    supp.Db = db
-    supp.ARGS  = make(map[string]interface{})
-    supp.OTHER = make(map[string]interface{})
-
-    err = supp.ExecSQL(`drop table if exists testing`)
-    if err != nil { panic(err) }
-    err = supp.ExecSQL(`CREATE TABLE testing (tid timestamp, child binary(8), id bigint)`)
-    if err != nil { panic(err) }
-
-    hash = map[string]interface{}{"id":id1,"child":"john"}
-    supp.ARGS = hash
-    err = supp.Insert()
-    if err != nil { panic(err) }
-
-    hash = map[string]interface{}{"id":id1,"child":"sam"}
-    supp.ARGS = hash
-    err = supp.Insert()
-    if err != nil { panic(err) }
-
-    hash = map[string]interface{}{"id":id2,"child":"mary"}
-    supp.ARGS = hash
-    err = supp.Insert()
-    if err != nil { panic(err) }
-
-    hash = map[string]interface{}{"id":id3,"child":"kkk"}
-    supp.ARGS = hash
-    err = supp.Insert()
-    if err != nil { panic(err) }
-
-
-	st, err := NewModel(getString("m3.json"))
-    if err != nil { panic(err) }
-    st.Db = db
-    st.ARGS  = make(map[string]interface{})
-    st.OTHER = make(map[string]interface{})
-
-	storage := make(map[string]map[string]interface{})
-	storage["model"]= make(map[string]interface{})
-	storage["model"]["testing"]= st
-	storage["action"]= make(map[string]interface{})
-	tt := make(map[string]interface{})
-	tt["topics"] = func(args ...map[string]interface{}) error {
-        return st.Topics(args...)
-    }
-	storage["action"]["testing"] = tt
-
-	model.Storage = storage
-	err = model.Topics()
-    if err != nil { panic(err) }
-// []map[string]interface {}{map[string]interface {}{"id":1576360769063, "x":"a1234567", "y":"b1234567"}, map[string]interface {}{"id":1576360769065, "x":"c1234567", "y":"d1234567", "z":"e1234"}, map[string]interface {}{"id":1576360769067, "x":"e1234567", "y":"f1234567", "z":"e1234"}}
-// map[string]interface {}{"testing_topics":[]map[string]interface {}{map[string]interface {}{"child":"john", "id":1576360769063, "tid":1576360769068}, map[string]interface {}{"child":"sam", "id":1576360769063, "tid":1576360769070}, map[string]interface {}{"child":"mary", "id":1576360769065, "tid":1576360769072}, map[string]interface {}{"child":"kkk", "id":1576360769067, "tid":1576360769073}}}
-
-    lists := model.LISTS
-    list0 := lists[0]
-    if len(lists) != 3 ||
-        list0["x"].(string) != "a1234567" {
-        t.Errorf("%#v", list0)
-    }
-    other := model.OTHER
-    relate := other["testing_topics"].([]map[string]interface{})
-    if len(relate) != 4 ||
-        relate[0]["child"].(string) != "john" {
-        t.Errorf("%#v", relate)
-	}
-
 	db.Close()
 }

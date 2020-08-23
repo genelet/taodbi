@@ -2,6 +2,12 @@ package taodbi
 
 import (
 	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"math"
+	"regexp"
 )
 
 // Navigate is interface to implement Model
@@ -40,6 +46,23 @@ type Model struct {
 	aARGS map[string]interface{}
 	// aLISTS: output data as slice of map, which represents a table row
 	aLISTS []map[string]interface{}
+}
+
+// NewModel creates a new Model struct from json file 'filename'
+// You should use SetDB to assign a database handle and
+// SetArgs to set input data, a url.Value, to make it working
+//
+func NewModel(filename string) (*Model, error) {
+    content, err := ioutil.ReadFile(filename)
+    if err != nil { return nil, err }
+    var parsed *Model
+    if err := json.Unmarshal(content, &parsed); err != nil {
+        return nil, err
+    }
+    parsed.Crud.fulfill()
+	parsed.acrud = parsed
+
+    return parsed, nil
 }
 
 // GetLists get main data as slice of mapped row
@@ -180,4 +203,170 @@ func (self *Model) properValuesHash(vs []string, extra map[string]interface{}) m
 		hash[v] = values[i]
 	}
 	return hash
+}
+
+// Topics selects many rows, optionally with restriction defined in 'extra'.
+func (self *Model) Topics(extra ...map[string]interface{}) error {
+	ARGS := self.aARGS
+	totalForce := self.TotalForce // 0 means no total calculation
+	_, ok1 := ARGS[self.Rowcount]
+	pageno, _ := ARGS[self.Pageno]
+	totalno, ok3 := ARGS[self.Totalno]
+	if totalForce != 0 && ok1 && (!ok3 || pageno.(int) == 1) {
+        nt := 0
+        if totalForce < -1 { // take the absolute as the total number
+            nt = int(math.Abs(float64(totalForce)))
+        } else if totalForce == -1 || !ok3 { // optionally cal
+            if err := self.totalHash(&nt, extra...); err != nil {
+                return err
+            }
+        } else {
+            nt = totalno.(int)
+        }
+        ARGS[self.Totalno] = nt
+    }
+
+	hashPars := self.topicsHashPars
+    if fields, ok := self.aARGS[self.Fields]; ok {
+        hashPars = generalHashPars(self.TopicsHash, self.TopicsPars, fields.([]string))
+    }
+
+	self.aLISTS = make([]map[string]interface{}, 0)
+	return self.topicsHash(&self.aLISTS, hashPars, self.orderString(), extra...)
+}
+
+// orderString outputs the ORDER BY string using information in args
+func (self *Model) orderString() string {
+    ARGS := self.aARGS
+    column := self.CurrentKey
+    if sortby, ok := ARGS[self.Sortby]; ok {
+        column = sortby.(string)
+    }
+
+    order := "ORDER BY " + column
+    if _, ok := ARGS[self.Sortreverse]; ok {
+        order += " DESC"
+    }
+    if Rowcount, ok := ARGS[self.Rowcount]; ok {
+		rowcount := Rowcount.(int)
+        pageno := 1
+        if Pageno, ok := ARGS[self.Pageno]; ok {
+			pageno = Pageno.(int)
+        }
+        order += " LIMIT " + fmt.Sprintf("%d", rowcount) + " OFFSET " + fmt.Sprintf("%d", (pageno-1)*rowcount)
+    }
+
+    matched, err := regexp.MatchString("[;'\"]", order)
+    if err != nil || matched {
+        return ""
+    }
+    return order
+}
+
+// Edit selects few rows (usually one) using primary key value in ARGS,
+// optionally with restrictions defined in 'extra'.
+func (self *Model) Edit(extra ...map[string]interface{}) error {
+	val := self.editIdVal(extra...)
+	if !hasValue(val) {
+		return errors.New("pk value not provided")
+	}
+
+	hashPars := self.editHashPars
+    if fields, ok := self.aARGS[self.Fields]; ok {
+        hashPars = generalHashPars(self.EditHash, self.EditPars, fields.([]string))
+    }
+
+	self.aLISTS = make([]map[string]interface{}, 0)
+	return self.editHash(&self.aLISTS, hashPars, val, extra...)
+}
+
+// EditFK selects ony one using 'foreign key' value in ARGS,
+// optionally with restrictions defined in 'extra'.
+func (self *Model) EditFK(extra ...map[string]interface{}) error {
+    id := self.ForeignKey
+    val := self.aARGS[id]
+    if hasValue(extra) {
+        val = self.properValue(id, extra[0])
+    }
+    if val == nil {
+        return errors.New("Foreign key has no value")
+    }
+
+	hashPars := self.editHashPars
+    if fields, ok := self.aARGS[self.Fields]; ok {
+        hashPars = generalHashPars(self.EditHash, self.EditPars, fields.([]string))
+    }
+
+    self.aLISTS = make([]map[string]interface{}, 0)
+    return self.editHashFK(&self.aLISTS, hashPars, []interface{}{val}, extra...)
+}
+
+// Insert inserts a row using data passed in ARGS. Any value defined
+// in 'extra' will override that in ARGS and be used for that column.
+func (self *Model) Insert(extra ...map[string]interface{}) error {
+	fieldValues := self.getFv(self.InsertPars)
+	if hasValue(extra) {
+		for key, value := range extra[0] {
+			if grep(self.InsertPars, key) {
+				fieldValues[key] = value
+			}
+		}
+	}
+	if !hasValue(fieldValues) {
+		return errors.New("no data to insert")
+	}
+
+	if err := self.insertHash(fieldValues); err != nil {
+		return err
+	}
+
+	fieldValues[self.CurrentKey] = self.LastID
+	self.aARGS[self.CurrentKey] = self.LastID
+	self.aLISTS = make([]map[string]interface{}, 0)
+	self.aLISTS = append(self.aLISTS, fieldValues)
+
+	return nil
+}
+
+// Insupd inserts a new row if it does not exist, or retrieves the old one,
+// depending on the unique of the columns defined in InsupdPars.
+func (self *Model) Insupd(extra ...map[string]interface{}) error {
+	fieldValues := self.getFv(self.InsupdPars)
+	if hasValue(extra) {
+		for key, value := range extra[0] {
+			if grep(self.InsertPars, key) {
+				fieldValues[key] = value
+			}
+		}
+	}
+	if !hasValue(fieldValues) {
+		return errors.New("unique value not found")
+	}
+
+	lists := make([]map[string]interface{}, 0)
+    if err := self.topicsHash(&lists, self.CurrentKey, "", fieldValues); err != nil {
+        return err
+    }
+
+	if len(lists) > 1 {
+        return errors.New("multiple returns for unique key")
+    }
+
+	args := self.properValuesHash(self.InsertPars, nil)
+	if len(lists) == 1 {
+		self.Updated = true
+        args[self.CurrentKey] = lists[0][self.CurrentKey]
+	}
+	if err := self.insertHash(args); err != nil {
+		return err
+	}
+
+	if self.Updated {
+		self.LastID = args[self.CurrentKey].(int64)
+	} else {
+		args[self.CurrentKey] = self.LastID
+	}
+	self.aLISTS = append(self.aLISTS, args)
+
+	return nil
 }
