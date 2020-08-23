@@ -12,8 +12,8 @@ import (
 type Rmodel struct {
 	Model
 
-	ProfileTable *crud    `json:"profile_table,omitempty"` // non unique fields
-	StatusTable  *crud    `json:"status_table,omitempty"`  // gmark_delete
+	ProfileTable *Model    `json:"profile_table,omitempty"` // non unique fields
+	StatusTable  *Model    `json:"status_table,omitempty"`  // gmark_delete
 }
 
 // NewRmodel creates a new Rmodel struct from json file 'filename'
@@ -27,7 +27,7 @@ func NewRmodel(filename string) (*Rmodel, error) {
 	if err := json.Unmarshal(content, &parsed); err != nil {
         return nil, err
     }
-    parsed.crud.fulfill()
+    parsed.fulfill()
     parsed.ProfileTable.fulfill()
     parsed.StatusTable.fulfill()
 

@@ -24,7 +24,7 @@ func NewSmodel(filename string) (*Smodel, error) {
     if err := json.Unmarshal(content, &parsed); err != nil {
         return nil, err
     }
-    parsed.crud.fulfill()
+    parsed.fulfill()
 	parsed.acrud = parsed
 
     return parsed, nil
