@@ -3,8 +3,15 @@ An abstract interface class to access the big data system TDengine in GO. Check 
 
 [![GoDoc](https://godoc.org/github.com/genelet/taodbi?status.svg)](https://godoc.org/github.com/genelet/taodbi)
 
-[TDengine](https://github.com/taosdata/TDengine) is a very fast open-source database system. It comes with a [GO connector](https://github.com/taosdata/driver-go). This _taodbi_ GO package provides _abstract_ classes to access it, which some users may feel more convenient to use. In an advanced usage, one can call multiple *JOINed* tables in one statement, just like relational database.
+[TDengine](https://github.com/taosdata/TDengine) is a very fast open-source database system. It comes with a [GO connector](https://github.com/taosdata/driver-go). This _taodbi_ GO package provides a set of *abstract* classes to access it, and to simulate *Update* and *Delete* verbs as in relational database system. 
 
+There are three levels of usages:
+
+- _Basic_: operating on raw SQL statements and stored procedures.
+- _Model_: operating on specific table and fulfilling CRUD actions, as *Model* in MVC pattern.
+  - *R-Model*: simulating full CRUD or RESTful actions
+  - *S-Model*: operating on *TDengine*'s own *S-Table* 
+- _Schema_: operating on whole database schema and fulfilling RESTful and GraphQL actions.
 
 
 ### Installation
@@ -13,49 +20,52 @@ An abstract interface class to access the big data system TDengine in GO. Check 
 $ go get -u github.com/genelet/taodbi
 ```
 
-Or manually clone from [github](https://github.com/genelet/taodbi) and place it under your GOPATH
-```
-$ git clone https://github.com/genelet/taodbi.git
-```
+### Termilogy
 
-There are three levels of usages: Basic, Map and Advanced.
+The names of arguments passed in functions or methods in this package are defined as follows, if not specifically explained:
+Name | Type | IN/OUT | Where | Meaning
+---- | ---- | ------ | ----- | -------
+*args* | `...interface{}` | IN | `DBI` | single-valued interface slice, possibly empty
+*args* | `url.Values` | IN | `Model` | via SetArgs() to set input data
+*args* | `url.Values` | IN | `Schema` | input data passing to Run()
+*extra* | `url.Values` | IN | `Model`,`Schema` | WHERE constraints; single value - EQUAL,  multi value - IN
+*lists* | `[]map[string]interface{}` | OUT | all | output as slice of rows; each row is a map.
+*res* | `map[string]interface{}` | OUT | `DBI` | output for one row
 
-
-
+<br /><br />
 
 ## Chapter 1. BASIC USAGE
 
+### 1.1  Type _DBI_
 
-### 1.1) Data Type _DBI_
+The `DBI` type simply embeds the standard SQL handle.
 
-The struct _DBI_ is a wrapper of the standard _database/sql_ handle.
-```
-package taodbi
+```go
+package godbi
 
 type DBI struct {
-    Db        *sql.DB
-    Affected  int64
+    *sql.DB          // Note this is the pointer to the handle
+    LastID    int64  // read only, saves the last inserted id
+    Affected  int64  // read only, saves the affected rows
 }
 
 ```
-where _Db_ is the database handle; _Affected_ saves affected number of rows after an operation.
 
-#### Create a new handle
+#### 1.1.1) Create a new handle
 
-Use this function:
-```
-func Open(dataSourceName string) (*DB, error)
+```go
+dbi := &DBI{DB: the_standard_sql_handle}
 ```
 
-So you get a _DBI_ instance by:
-```
-&DBI{Db: created_handle}
-```
+#### 1.1.2) Example
 
-#### Example
+In this example, we create a MySQL handle using database credentials in the environment; then create a new table _letters_ and add 3 rows. We query the data using `SelectSQL` and put the result into `lists` as slice of maps.
 
-Create an instance; use it to create a new database and a table; add a row; and query the row:
-```
+<details>
+    <summary>Click for Sample 1</summary>
+    <p>
+
+```go
 package main
 
 import (
@@ -71,26 +81,26 @@ func main() {
 
     dbi := &taodbi.DBI{Db: db}
 
-    err = dbi.ExecSQL(`CREATE DATABASE IF NOT EXISTS mydbi precision "us"`)
+    err = dbi.DoSQL(`CREATE DATABASE IF NOT EXISTS mydbi precision "us"`)
     if err != nil { panic(err) }
-    err = dbi.ExecSQL(`USE mydbi`)
+    err = dbi.DoSQL(`USE mydbi`)
     if err != nil { panic(err) }
-    err = dbi.ExecSQL(`DROP TABLE IF EXISTS mytable`)
+    err = dbi.DoSQL(`DROP TABLE IF EXISTS mytable`)
     if err != nil { panic(err) }
-    err = dbi.ExecSQL(`CREATE TABLE mytable 
+    err = dbi.DoSQL(`CREATE TABLE mytable 
 (ts timestamp, id int, name binary(8), len tinyint, flag bool, notes binary(8), fv float, dv double)`)
     if err != nil { panic(err) }
-    err = dbi.ExecSQL(`INSERT INTO mytable (ts, id, name, len, flag, notes, fv, dv)
+    err = dbi.DoSQL(`INSERT INTO mytable (ts, id, name, len, flag, notes, fv, dv)
 VALUES (now, ?, ?, 30, true, 'abcdefgh', 789.123, 456.789)`, 1234, `company`)
     if err != nil { panic(err) }
     lists := make([]map[string]interface{},0)
-    err = dbi.QuerySQL(&lists,
+    err = dbi.SelectSQL(&lists,
 `SELECT ts, id, name, len, flag, fv FROM mytable WHERE id=?`, 1234)
     if err != nil { panic(err) }
     
     log.Printf("%v", lists)
 
-    err = dbi.ExecSQL(`DROP DATABASE IF EXISTS mydbi`)
+    err = dbi.DoSQL(`DROP DATABASE IF EXISTS mydbi`)
     if err != nil { panic(err) }
 
     os.Exit(0)
@@ -101,349 +111,660 @@ Running this example will report something like
 [map[flag:true fv:789.123 id:1234 len:30 name:company ts:2020-07-19 09:07:48.341270]]
 ```
 
+</p>
+</details>
 
-### 1.2) Execute an action on database or table, _ExecSQL_
+<br /><br />
 
+### 1.2  Execution `DoSQL`
+
+```go
+func (*DBI) DoSQL  (query string, args ...interface{}) error
 ```
-err = dbi.ExecSQL(`CREATE DATABASE mytest`)
-err = dbi.ExecSQL(`CREATE TABLE mytable 
-        (ts timestamp, id int, name binary(8), len tinyint, flag bool, notes binary(8), fv float, dv double)`)
-err = dbi.ExecSQL(`INSERT INTO mytable (ts, id, name, len, name, flag, notes, fv, dv)
-        VALUES (now, ?, ?, 30, true, 'abcdefgh', 789.123, 456.789)`, 1234, `company`)
-// after INSERT, dbi.Affected will be 1
+
+Similar to SQL's `Exec`, `DoSQL` executes *Do*-type (e.g. _INSERT_ or _UPDATE_) queries. It runs a prepared statement and may be safe for concurrent use by multiple goroutines.
+
+For all functions in this package, the returned value is always `error` which should be checked to assert if the execution is successful.
+
+<br /><br />
+
+### 1.3   _SELECT_ Queries
+
+#### 1.3.1)  `SelectSQL`
+
+```go
+func (*DBI) SelectSQL(lists *[]map[string]interface{}, query string, args ...interface{}) error
 ```
 
-Note that by default, any database function in this package will return *error* for errors, or *nil* for success. 
+Run the *SELECT*-type query and put the result into `lists`, a slice of column name-value maps. The data types of the column are determined dynamically by the generic SQL handle.
 
+<details>
+    <summary>Click for example</summary>
+    <p>
 
-### 1.3) Execute using _DoSQL_ 
-
-It does the same thing, but with a prepared statement and thus being safe for concurrent use by multiple goroutines.
-
-
-### 1.4) Select using *QuerySQL*, *QuerySQLType* and *QuerySQLTypeLabel*
-
-```
+```go
 lists := make([]map[string]interface{})
-err = dbi.QuerySQL(&lists,
-        `SELECT ts, id, name, len, flag, fv FROM mytable WHERE id=?`, 1234)
-```
-This will select all rows with _id=1234_ and put the result into *lists*, as an array of maps:
-```
-[
-        {"ts":"2019-12-15 01:01:01.1234", "id":1234, "name":"company", "len":30, "flag":true, "fv":789.123},
-        ....
-]
-```
-The generic _database/sql_ will assign correct data types on most named variables, but may fail in few cases. e.g. a _tinyint_ may be assigned to be _int_. 
-
-To get *EXACTLY* the needed data types, use *QuerySQLType*:
-```
-err = dbi.QuerySQLType(&lists, []string{"string", "int", "string", "int8", "bool", "float32},
-        `SELECT ts, id, name, len, flag, fv FROM mytable WHERE id=?`, 1234)
-```
-To change the columns names, use *QuerySQLTypeLabel*. E.g.
-```
-err = dbi.QuerySQLTypeLabel(&lists, []string{"string", "int", "string", "int8", "bool", "float32},
-        []string{"lable_ts", "label_id", "label_name", "other_name1", "other2", "last3"},
-        `SELECT ts, id, name, len, flag, fv FROM mytable WHERE id=?`, 1234)
+err = dbi.DoSQL(&lists,
+    `SELECT ts, id, name, len, flag, fv FROM mytable WHERE id=?`, 1234)
 ```
 
+will select all rows with *id=1234*.
 
-### 1.5) Select using *SelectSQL*, *SelectSQLType* and *SelectSQlTypeLabel* 
+```json
+    {"ts":"2019-12-15 01:01:01", "id":1234, "name":"company", "len":30, "flag":true, "fv":789.123},
+    ....
+```
 
-They are similar to *QuerySQL*, *QuerySQLType* and *QuerySQLTypeLabel*, respectively, based on *prepared* statement.
+</p>
+</details>
 
+`SelectSQL` runs a prepared statement.
 
-### 1.6) Function *Quote*
+#### 1.3.2) `SelectSQLType`
+
+```go
+func (*DBI) SelectSQLType(lists *[]map[string]interface{}, typeLabels []string, query string, args ...interface{}) error
+```
+
+They differ from the above `SelectSQL` by specifying the data types. While the generic handle could correctly figure out them in most cases, it occasionally fails because there is no exact matching between SQL types and GOLANG types.
+
+The following example assigns _string_, _int_, _string_, _int8_, _bool_ and _float32_ to the corresponding columns:
+
+```go
+err = dbi.SelectSQLType(&lists, []string{"string", "int", "string", "int8", "bool", "float32},
+    `SELECT ts, id, name, len, flag, fv FROM mytable WHERE id=?`, 1234)
+```
+
+#### 1.3.3) `SelectSQLLabel`
+
+```go
+func (*DBI) SelectSQLLabel(lists *[]map[string]interface{}, selectLabels []string, query string, args ...interface{}) error
+```
+
+They differ from the above `SelectSQL` by renaming the default column names to `selectLabels`.
+
+<details>
+    <summary>Click for example</summary>
+    <p>
+
+```go
+lists := make([]map[string]interface{})
+err = dbi.querySQLLabel(&lists, []string{"time stamp", "record ID", "recorder name", "length", "flag", "values"},
+    `SELECT ts, id, name, len, flag, fv FROM mytable WHERE id=?`, 1234)
+```
+
+The result has the renamed keys:
+
+```json
+    {"time stamp":"2019-12-15 01:01:01", "record ID":1234, "recorder name":"company", "length":30, "flag":true, "values":789.123},
+```
+
+</p>
+</details>
+
+#### 1.3.4) `SelectSQlTypeLabel`
+
+```go
+func (*DBI) SelectSQLTypeLabel(lists *[]map[string]interface{}, typeLabels []string, selectLabels []string, query string, args ...interface{}) error
+```
+
+These functions re-assign both data types and column names in the queries.
+
+<br /><br />
+
+### 1.4  Query Single Row
+
+In some cases we know there is only one row from a query.
+
+#### 1.4.1) `GetSQLLable`
+
+```go
+func (*DBI) GetSQLLabel(res map[string]interface{}, query string, selectLabels []string, args ...interface{}) error
+```
+
+which is similar to `SelectSQLLabel` but has only single output to `res`.
+
+#### 1.4.2) `GetArgs`
+
+```go
+func (*DBI) GetArgs(res url.Values, query string, args ...interface{}) error
+```
+
+which is similar to `SelectSQL` but has only single output to `res` which uses type [url.Values](https://golang.org/pkg/net/url/). This function will be used mainly in web applications, where HTTP request data are expressed in `url.Values`.
+
+<br /><br />
+
+### 1.5) Function *Quote*
 
 This static function escape a string for unsafe characters *[';]*. You don't need to call it in the above *ExecSQL* and *QuerySQL* because we already do it.
 
+<br /><br />
 
+## Chapter 2. MODEL USAGE
 
-## Chapter 2. MAP USAGE
+*taodbi* allows us to construct *model* as in the MVC Pattern in web applications, and to build RESTful API easily. The CRUD verbs on table are defined to be:
+C | R | U | D
+---- | ---- | ---- | ----
+create a new row | read all rows, or read one row | update a row | delete a row
 
+The RESTful web actions are associated with the CRUD verbs as follows:
 
-Sometimes it is more flexible to insert data or search records by using *map* (i.e. *hash* or *associated array*). 
-```
-type Crud struct {
-        DBI          
-        CurrentTable string                 `json:"current_table"`
-        CurrentKey   string                 `json:"current_key"`
-        LastID       int64                  
-        CurrentRow   map[string]interface{}
-        Updated      bool
+<details>
+    <summary>Click for RESTful vs CRUD</summary>
+    <p>
+
+HTTP METHOD | Web URL | CRUD | Function | Available
+----------- | ------- | ---- | -------- | ---------
+GET         | webHandler | R All | Topics | model, rmodel & smodel
+GET         | webHandler/ID | R One | Edit | model, rmodel & smodel
+POST        | webHandler | C | Insert | model, rmodel & smodel
+PUT         | webHandler | U | Update | rmodel
+PATCH       | webHandler | NA | Insupd | rmodel
+DELETE      | webHandler | D | Delete | rmodel
+
+</p>
+</details>
+
+As a time series big data system, *TDengine* does not implement *Update* nor *Delete* verbs. This package simulates them in *R-Model*. Therefore, we have
+three types of *Model*:
+- *Model*, operating on TDengine tables with only *R* and *C* verbs
+- *Rmodel*, operating on simulated TDengine tables with full *CRUD* verbs
+- *Smodel*, operating on TDengine's super tables with only *R* nd *C* verbs
+
+<br /><br />
+
+### 2.1  Type *Table*
+
+*taodbi* uses JSON to express the CRUD fields and logic. There should be one, and
+only one, JSON (file or string) assigned to each database table. The JSON is designed only once. In case of any change in the business logic, we can modify it, which is much cleaner and easier to do than changing program code, as in ORM.
+
+Here is the `Table` type:
+
+```go
+    CurrentTable   string             `json:"current_table,omitempty"`   // the current table name
+    CurrentKey     string             `json:"current_key,omitempty"`     // the single primary key of the table
+    ForeignKey     string             `json:"foreign_key,omitempty"`     // optional, a FK-like column 
+    InsertPars     []string           `json:"insert_pars,omitempty"`     // columns to insert in C
+    InsupdPars     []string           `json:"insupd_pars,omitempty"`     // unique columns in PATCH
+    EditPars       []interface{}      `json:"edit_pars,omitempty"`       // columns to query in R (one)
+    EditHash   map[string]interface{} `json:"edit_hash,omitempty"`       // R(a) with specific types and labels
+    TopicsPars     []interface{}      `json:"topics_pars,omitempty"`     // columns to query in R (all)
+    TopicsHash map[string]interface{} `json:"topics_hash,omitempty"`     // R(a) with specific types and labels
+    TotalForce     int                `json:"total_force,omitempty"`     // if to calculate total counts in R(a)
+
+    Nextpages      map[string][]*Page `json:"nextpages,omitempty"`       // to call other models' verbs
+
+    // The following fields are just variable names to pass in a web request,
+    // default to themselves. e.g. "empties" for "Empties", "maxpageno" for Maxpageno etc.
+    Empties        string             `json:"empties,omitempty"`         // columns are updated to NULL if no input
+    Fields         string             `json:"fields,omitempty"`          // use this smaller set of columns in R
+    // the following fields are for pagination.
+    Totalno        string             `json:"totalno,omitempty"`         // total item no.
+    Rowcount       string             `json:"rowcount,omitempty"`        // counts per page
+    Pageno         string             `json:"pageno,omitempty"`          // current page no.
+    Sortreverse    string             `json:"sortreverse,omitempty"`     // if reverse sorting
+    Sortby         string             `json:"sortby,omitempty"`          // sorting column
 }
-
-```
-where *CurrentTable* is the table you are working with, *CurrentKey* the primary key in the table, always a [*timestamp*](https://www.taosdata.com/en/documentation/taos-sql/#Data-Query). *LastID*, *CurrentRow* and *Updated* are for the last inserted row.
-
-You create an instance of *Crud* by
-```
-crud := &taodbi.Crud{Db:db, CurrentTable:mytable, CurrentKey:ts}
 ```
 
+And here is explanation of the fields:
 
-### 2.1) Insert one row, *InsertHash*
-```
-err = crud.InsertHash(map[string]interface{}{
-        {"ts":"2019-12-31 23:59:59.9999", "id":7890, "name":"last day", "fv":123.456}
-})
-```
-If you miss the primary key, the package will automatically assign *now* to be the value.
+<details>
+    <summary>Click to Show Fields in Model</summary>
+    <p>
 
+Field in Model | JSON variable | Database Table
+-------------- | ------------- | --------------
+CurrentTable | current_table | the current table name
+CurrentKey | current_key | the single primary key of the table
+ForeignKey | foreign_key | optional, a foreign-like column, explained below 
+InsertPars     | insert_pars | columns to insert in C
+InsupdPars     | insupd_pars | unique columns in PATCH
+EditPars       | edit_pars | columns to query in R (one)
+TopicsPars     | topics_pars | columns to query in R (all)
+TotalForce     | total_force | if to calculate total counts in R (all)
 
-### 2.2) Insert or Retrieve an old row, *InsupdHash*
+</p>
+</details>
 
-Sometimes a record may already be existing in the table, so you'd like to insert if it is not there, or retrieve it. Function *InsupdHash* is for this purpose:
-```
-err = crud.InsupdHash(map[string]interface{}{
-        {"ts":"2019-12-31 23:59:59.9999", "id":7890, "name":"last day", "fv":123.456}},
-        []string{"id","name"},
-)
-```
-It identifies the uniqueness by the combined valuse of *id* and *name*. In both the cases, you get the ID in *crud.LastID*, the row in *CurrentRow*, and the case in *Updated* (true for old record, and false for new). 
+#### 2.1.1) *Read* with specific types and/or names
 
+While in most cases we *Read* by simple column slice, i.e. *EditPars* & *TopicsPars*,
+occasionally we need specific names and types in output. Here is what *godbi* will do
+in case of existence of *EditHash* or/and *TopicsHash*.
 
-### 2.3) Select many rows, *TopicsHash*
+<details>
+    <summary>Click to show <em>EditPars</em>, <em>EditHash</em>, <em>TopicsPars</em> and <em>TopicsHash</em></summary>
+    <p>
 
-Search many by *TopicsHash*:
-```
-lists := make([]map[string]interface{})
-restriction := map[string]interface{}{"len":10}
-err = crud.TopicsHash(&lists, []string{"ts", "name", "id"}, restriction)
-```
-which returns all records with restriction *len=10*. You specifically define which columns to return in second argument,
-which are *ts*, *name* and *id* here. 
+interface | variable | column names
+--------- | -------- | ------------
+ *[]string{name}* | EditPars, TopicsPars | just a list of column names
+ *[][2]string{name, type}* | EditPars, TopicsPars | column names and their data types
+ *map[string]string{name: label}* | EditHash, TopicsHash | rename the column names by labels
+ *map[string][2]string{name: label, type}* | EditHash, TopicsHash | rename and use the specific types
 
-Only three types of _restriction_ are supported in map:
-- _key:value_  The *key* has *value*.
-- _key:slice_  The *key* has one of values in *slice*.
-- _"_gsql":"row sql statement"_  Use the special key *_gsql* to write a raw SQL statment.
+</p>
+</details>
 
+#### 2.1.2) Pagination
 
-### 2.4) Select one row, *EditHash*
+We have define a few variable names whose values can be passed in input data, to make *Read All* in pagination.
 
-```
-lists := make([]map[string]interface{})
-err = crud.EditHash(&lists, []string{"ts", "name", "id"}, "2019-12-31 23:59:59.9999")
-```
-Here you select by its primary key value (the timestamp). 
+First, use `TotalForce` to define how to calculate the total row count.
 
-Optionally, you may input an array of few key values and get them all in *lists*. Or you may put a restriction map too.
+<details>
+    <summary>Click for meaning of *TotalForce*</summary>
+    <p>
 
+Value | Meaning
+----- | -------
+<-1  | use ABS(TotalForce) as the total count
+-1   | always calculate the total count
+0    | don't calculate the total count
+&gt; 0  | calculate only if the total count is not passed in `args`
 
+</p>
+</details>
 
+If variable `rowcount` (*number of records per page*) is set in input, and field `TotalForce` is not 0, then pagination will be triggered. The total count and total pages will be calculated and put back in variable names `totalno` and `maxpageno`. For consecutive requests, we should attach values of *pageno*, *totalno* and *rowcount* to get the
+right page back.
 
-## Chapter 3. ADVANCED USAGE
+By combining *TopicsHash*, *CurrentTables* and the pagination variables, we can build up quite sophisticated SQLs for most queries.
 
-*Model* is even a more detailed class operation on TDengine table.
+#### 2.1.3) Definition of *Next Pages*
 
-### 3.1) Class *Model*
+As in GraphQL and gRCP, *godbi* allows an action to trigger multiple actions on other models. To what actions
+on other models will get triggered, define *Nextpages* in *Table*.
 
-```
-type Model struct {
-    Crud `json:"crud,omitempty"`
+Here is type *Page*:
 
-    ARGS  map[string]interface{}   `json:"args,omitempty"`
-    LISTS []map[string]interface{} `json:"lists,omitempty"`
-    OTHER map[string]interface{}   `json:"other,omitempty"`
-
-    SORTBY      string `json:"sortby,omitempty"`
-    SORTREVERSE string `json:"sortreverse,omitempty"`
-    PAGENO      string `json:"pageno,omitempty"`
-    ROWCOUNT    string `json:"rowcount,omitempty"`
-    TOTALNO     string `json:"totalno,omitempty"`
-
-    Nextpages map[string][]map[string]interface{} `json:"nextpages,omitempty"`
-    Storage   map[string]map[string]interface{}   `json:"storage,omitempty"`
-
-    InsertPars []string `json:"insert_pars,omitempty"`
-    InsupdPars []string `json:"insupd_Pars,omitempty"`
-
-    EditPars   []string          `json:"edit_pars,omitempty"`
-    TopicsPars []string          `json:"topics_pars,omitempty"`
-    EditMap    map[string]string `json:"edit_map,omitempty"`
-    TopicsMap  map[string]string `json:"topics_map,omitempty"`
-
-    TotalForce int `json:"total_force,omitempty"`
+```go
+type Page struct {
+    Model      string            `json:"model"`                 // name of the next model to call  
+    Action     string            `json:"action"`                // action name of the next model
+    RelateItem map[string]string `json:"relate_item,omitempty"` // column name mapped to that of the next model
+    Manual     map[string]string `json:"manual,omitempty"`      // manually assign these constraints
 }
-
 ```
 
-####  3.1.1) Table column names
-- _InsertPars_ defines column names used for insert a new data
-- _InsupdPars_ defines column names used for uniqueness 
-- _EditPars_ defines which columns to be returned in *search one* action *Edit*.
-- _TopicsPars_ defines which columns to be returned in *search many* action *Topics*.
+Assume there are two tables, one for family and the other for children, corresponding to two models `ta` and `tb` respectively.
 
-#### 3.1.2) Incoming data *ARGS*
+When we *GET* the family name, we'd like to show all children under the family name as well. Technically, it means that running `Topics` on `ta` will trigger `Topics` on `tb`, constrained by the association of family's ID in both the tables. The same is true for `Edit` and `Insert`. So for the family model, its `Nextpages` will look like
 
-- Case *search many*, it contains data for *pagination*. 
-- Case *insert*, it stores the new row as hash (so the package takes column values of _EditPars_ from *ARGS*).
+<details>
+    <summary>Click to show the JSON string</summary>
+    <p>
 
-#### 3.1.3) Output *LISTS*
-
-In case of *search* (*Edit* and *Topics*), the output data are stored in *LISTS*.
-
-#### 3.1.4) Pagination, used in *Topics*.
-- *ARGS[SORTBY]* defines sorting by which column
-- *ARGS[SORTREVERSE]* defines if a reverse sort
-- *ARGS[ROWCOUNT]* defines how many records on each page, an incoming data
-- *ARGS[PAGENO]* defines which page number, an incoming data
-- *ARGS[TOTALNO]* defines total records available, an output data
-
-Based on those information, developers can build paginations.
-
-#### 3.1.5) Nextpages, calling multiple tables
-
-In many applications, your data involve multiple tables. This function is especially important in TDengine because it's not a relational database and thus has no *JOIN* to use. 
-
-You can define the retrival logic in *Nextpages*, usually expressed as a JSON struct. Assuming there are three *model*s: *testing1*, *testing2* and *testing3*, and you are working in *testing1* now. 
-```
-"nextpages": {
+```json
+{
+    "insert" : [
+        {"model":"tb", "action":"insert", "relate_item":{"id":"id"}}
+    ],
+    "edit" : [
+        {"model":"tb", "action":"topics", "relate_item":{"id":"id"}}
+    ],
     "topics" : [
-      {"model":"testing2", "action": "topics", "relate_item":{"id":"fid"}},
-      {"model":"testing3", "action": "topics"}
-    ] ,
-    "edit" : [...]
+        {"model":"tb", "action":"topics", "relate_item":{"id":"id"}}
+    ]
 }
 ```
 
-Thus when you run "topics" on the current model *testing1*, another action "topics" on model "testing2" will be triggered for each returned row. The new action on *testing2* is restricted to have that its column *fid* the same value as *testing1*'s *id*, as in *relate_item*. 
+</p>
+</details>
 
-The returned data will be attached to original row under the special key named *testing2_topics*.
+Parsing it will result in `map[string][]*Page`. *godbi* will run all the next pages automatically in chain.
 
-- Meanwhile, the above example runs action *topics* on *testing2* once, because there is no *relate_item* in the record.
-- The returned will be stored in class variable *OTHER* under key *testing3_topics*.
+<br /><br />
 
+### 2.2  Interface *Navigate*
 
-### 3.2) Create an instance, *NewModel*
+All *Model*, "Rmodel* and *Smodel* are implementations of interface *Navigate*.
 
-An instance is usually created from a JSON string defining the table schema and logic in relationship between tables:
-```
-model, err := &taodbi.Model(json_string)
-if err != nil {
-        panic(err)
+```go
+type Navigate interface {
+    SetArgs(url.Values)                            // set http request data
+    SetDB(*sql.DB)                                 // set the database handle
+    GetAction(string)   func(...url.Values) error  // get function by action name
+    GetLists()          []map[string]interface{}   // get result after an action
 }
-// create dbi as above
-model.DBI = dbi
-// create args as a map
-model.ARGS = args
-
 ```
 
-If you need to call mutiple tables in one function, you need to put other model instances into *Storage*:
+#### 2.2.1) Set Database Handle and Input Data
+
+Use
+
+```go
+func (*Navigate) SetDB(db *sql.DB)
+func (*Navigate) SetArgs(args url.Values)
 ```
-// create the database handler "db"
-    c := newconf("config.json")
-    db, err := sql.Open(c.DbType, c.Dsn2)
+
+to set database handle `db`, and input data `args`. The input data is of type *url.Values*.
+In web applications, this is *Form* from http request in `net/http`.
+
+
+#### 2.2.2) Returning Data
+
+After we have run an action on the model, we can retrieve data using
+
+```go
+(*Model) GetLists()
+```
+
+The closure associated with the action name can be get back:
+
+```go
+(*Model) GetAction(name string) func(...url.Values) error
+```
+
+<br /><br />
+
+
+### 2.3  Type *Model*
+
+```go
+type Model struct {
+    DBI
+    Table
+    Navigate                                        // interface has methods to implement
+    Actions   map[string]func(...url.Values) error  // action name to closure map
+    Updated
+```
+
+where `Actions` is an action name to action closure map.
+
+#### 2.3.1) Constructor `NewModel`
+
+A `Model` instance can be parsed from JSON file on disk:
+
+```go
+func NewModel(filename string) (*Model, error)
+```
+
+where `filename` is the file name.
+
+#### 2.3.2) Optional Constraints
+
+For all RESTful methods of *Model*, we have option to put a data structure, named `extra` and of type `url.Values`, to constrain the *WHERE* statement. Currently we have supported 3 cases:
+
+<details>
+    <summary>Click to show *extra*</summary>
+    <p>
+
+key in `extra` | meaning
+--------------------------- | -------
+key has only one value | an EQUAL constraint
+key has multiple values | an IN constraint
+key is named *_gsql* | a raw SQL statement
+among multiple keys | AND conditions.
+
+</p>
+</details>
+
+
+#### 2.3.3) For Http METHOD: GET (read all)
+
+```go
+func (*Model) Topics(extra ...url.Values) error
+```
+
+#### 2.3.4) For Http METHOD: GET (read one)
+
+```go
+func (*Model) Edit(extra ...url.Values) error
+```
+
+#### 2.3.5) For Http METHOD: POST (create)
+
+```go
+func (*Model) Insert(extra ...url.Values) error
+```
+
+It inserts a new row using the input data. If `extra` is passed in, it will override the input data.
+
+#### 2.3.6）Example
+
+<details>
+    <summary>Click for example to run RESTful actions</summary>
+    <p>
+
+```go
+package main
+
+import (
+    "log"
+    "os"
+    "net/url"
+    "database/sql"
+    "github.com/genelet/godbi"
+    _ "github.com/go-sql-driver/mysql"
+)
+
+func main() {
+    dbUser := os.Getenv("DBUSER")
+    dbPass := os.Getenv("DBPASS")
+    dbName := os.Getenv("DBNAME")
+    db, err := sql.Open("mysql", dbUser + ":" + dbPass + "@/" + dbName)
     if err != nil { panic(err) }
-    
-// create your current model named "atesting", note that we have nextpages in it 
-    model, err := NewModel(`{
-    "crud": {
-        "current_table": "atesting",
-        "current_key" : "id"
-        },
-    "insupd_pars" : ["x","y"],
-    "insert_pars" : ["x","y","z"],
-    "edit_pars" : ["x","y","z","id"],
-    "topics_pars" : ["id","x","y","z"],
-    "nextpages" : {
-        "topics" : [
-            {"model":"testing", "action":"topics", "relate_item":{"id":"id"}}
-        ]
-    }
-}`)
+    defer db.Close()
+
+    model := new(godbi.Model)
+    model.CurrentTable = "testing"
+    model.Sortby        ="sortby"
+    model.Sortreverse   ="sortreverse"
+    model.Pageno        ="pageno"
+    model.Rowcount      ="rowcount"
+    model.Totalno       ="totalno"
+    model.Maxpageno     ="max_pageno"
+    model.Fields        ="fields"
+    model.Empties       ="empties"
+
+    db.Exec(`DROP TABLE IF EXISTS testing`)
+    db.Exec(`CREATE TABLE testing (id int auto_increment, x varchar(255), y varchar(255), primary key (id))`)
+
+    args := make(url.Values)
+    model.SetDB(db)
+    model.SetArgs(args)
+
+    model.CurrentKey    = "id"
+    model.CurrentIDAuto = "id"
+    model.InsertPars    = []string{     "x","y"}
+    model.TopicsPars    = []string{"id","x","y"}
+    model.UpdatePars    = []string{"id","x","y"}
+    model.EditPars      = []string{"id","x","y"}
+
+    args["x"] = []string{"a"}
+    args["y"] = []string{"b"}
+    if err := model.Insert(); err != nil { panic(err) }
+    log.Println(model.LastID)
+
+    args["x"] = []string{"c"}
+    args["y"] = []string{"d"}
+    if err := model.Insert(); err != nil { panic(err) }
+    log.Println(model.LastID)
+
+    if err := model.Topics(); err != nil { panic(err) }
+    log.Println(model.GetLists())
+
+    args.Set("id","2")
+    args["x"] = []string{"c"}
+    args["y"] = []string{"z"}
+    if err := model.Update(); err != nil { panic(err) }
+    if err := model.Edit(); err != nil { panic(err) }
+    log.Println(model.GetLists())
+
+    os.Exit(0)
+}
+```
+
+Running the program will result in
+
+```bash
+1
+2
+[map[id:1 x:a y:b] map[id:2 x:c y:d]]
+[map[id:2 x:c y:z]]
+```
+
+</p>
+</details>
+
+<br /><br />
+
+### 2.4 Type *Rmodel*
+
+```go
+type Rmodel struct {
+    Model
+
+    ProfileTable *Model `json:"profile_table,omitempty"` // non unique fields
+    StatusTable  *Model `json:"status_table,omitempty"`  // gmark_delete
+}
+```
+
+#### 2.4.1) Build Simulated RESTful Tables
+
+#### 2.4.2) Constructor `NewModel`
+
+A `Model` instance can be parsed from JSON file on disk:
+
+```go
+func NewModel(filename string) (*Model, error)
+```
+
+where `filename` is the file name.
+
+#### 2.4.3) For Http METHOD: GET (read all)
+
+```go
+func (*Model) Topics(extra ...url.Values) error
+```
+
+#### 2.4.4) For Http METHOD: GET (read one)
+
+```go
+func (*Model) Edit(extra ...url.Values) error
+```
+
+#### 2.4.5) For Http METHOD: POST (create)
+
+```go
+func (*Model) Insert(extra ...url.Values) error
+```
+
+It inserts a new row using the input data. If `extra` is passed in, it will override the input data.
+
+#### 2.4.6) Http METHOD: PUT (update)
+
+```go
+func (*Model) Update(extra ...url.Values) error
+```
+
+It updates a row using the input data, constrained by `extra`.
+
+#### 2.4.7) Http METHOD: PATCH (insupd)
+
+```go
+func (*Model) Insupd(extra ...url.Values) error
+```
+
+It inserts or updates a row using the input data, constrained optionally by `extra`.
+
+#### 2.4.8) Http METHOD: DELETE
+
+```go
+func (*Model) Delete(extra ...url.Values) error
+```
+
+It rows constrained by `extra`. For this function, the input data will NOT be used.
+
+#### 2.4.9）Example
+
+<details>
+    <summary>Click for example to run RESTful actions</summary>
+    <p>
+
+```go
+package main
+
+import (
+    "log"
+    "os"
+    "net/url"
+    "database/sql"
+    "github.com/genelet/godbi"
+    _ "github.com/go-sql-driver/mysql"
+)
+
+func main() {
+    dbUser := os.Getenv("DBUSER")
+    dbPass := os.Getenv("DBPASS")
+    dbName := os.Getenv("DBNAME")
+    db, err := sql.Open("mysql", dbUser + ":" + dbPass + "@/" + dbName)
     if err != nil { panic(err) }
-    model.Db = db
-    model.ARGS  = make(map[string]interface{})
-    model.OTHER = make(map[string]interface{})
+    defer db.Close()
 
-// create another model with name "testing"
-    st, err := NewModel(`{
-    "crud": {
-        "current_table": "testing",
-        "current_key" : "tid"
-    },
-    "insert_pars" : ["id","child"],
-    "edit_pars"   : ["tid","child","id"],
-    "topics_pars" : ["tid","child","id"]
-}`)
-    if err != nil { panic(err) }
-    st.Db = db
-    st.ARGS  = make(map[string]interface{})
-    st.OTHER = make(map[string]interface{})
+    model := new(godbi.Model)
+    model.CurrentTable = "testing"
+    model.Sortby        ="sortby"
+    model.Sortreverse   ="sortreverse"
+    model.Pageno        ="pageno"
+    model.Rowcount      ="rowcount"
+    model.Totalno       ="totalno"
+    model.Maxpageno     ="max_pageno"
+    model.Fields        ="fields"
+    model.Empties       ="empties"
 
-// create a storage to mark "testing"
-    storage := make(map[string]map[string]interface{})
-    storage["model"]= make(map[string]interface{})
-    storage["model"]["testing"]= st
-    storage["action"]= make(map[string]interface{})
-    tt := make(map[string]interface{})
-    tt["topics"] = func(args ...map[string]interface{}) error {
-        return st.Topics(args...)
-    }
-    storage["action"]["testing"] = tt
+    db.Exec(`DROP TABLE IF EXISTS testing`)
+    db.Exec(`CREATE TABLE testing (id int auto_increment, x varchar(255), y varchar(255), primary key (id))`)
+
+    args := make(url.Values)
+    model.SetDB(db)
+    model.SetArgs(args)
+
+    model.CurrentKey    = "id"
+    model.CurrentIDAuto = "id"
+    model.InsertPars    = []string{     "x","y"}
+    model.TopicsPars    = []string{"id","x","y"}
+    model.UpdatePars    = []string{"id","x","y"}
+    model.EditPars      = []string{"id","x","y"}
+
+    args["x"] = []string{"a"}
+    args["y"] = []string{"b"}
+    if err := model.Insert(); err != nil { panic(err) }
+    log.Println(model.LastID)
+
+    args["x"] = []string{"c"}
+    args["y"] = []string{"d"}
+    if err := model.Insert(); err != nil { panic(err) }
+    log.Println(model.LastID)
+
+    if err := model.Topics(); err != nil { panic(err) }
+    log.Println(model.GetLists())
+
+    args.Set("id","2")
+    args["x"] = []string{"c"}
+    args["y"] = []string{"z"}
+    if err := model.Update(); err != nil { panic(err) }
+    if err := model.Edit(); err != nil { panic(err) }
+    log.Println(model.GetLists())
+
+    os.Exit(0)
+}
 ```
 
-### 3.3) Actions (functions) on *Model*
+Running the program will result in
 
-#### 3.3.1) Insert one row, *Insert*
+```bash
+1
+2
+[map[id:1 x:a y:b] map[id:2 x:c y:d]]
+[map[id:2 x:c y:z]]
 ```
-err = model.Insert()
-```
-It will takes values from *ARGS* using pre-defined column names in *InsertPars*. If you miss the primary key, the package will automatically assign *now* to be the value.
 
+</p>
+</details>
 
-#### 3.3.2) Insert or Retrieve an old row, *Insupd*
-
-You insert one row as in *Insert* but if it is already in the table, retrieve it.
-```
-err = model.Insupd()
-```
-It identifies the uniqueness by the combined column valuse defined in *InsupdPars*. In both the cases, you get the ID in *model.LastID*, the row in *CurrentRow*, and the case in *Updated* (true for old record, and false for new). 
-
-
-#### 3.3.3) Select many rows, *Topics*
-
-Search many by *Topics*:
-```
-restriction := map[string]interface{}{"len":10}
-err = crud.Topics(restriction)
-```
-which returns all records with columns defined in *TopicsPars* with restriction *len=10*. The returned data is in *model.LISTS*
-
-Since you have assigned *nextpages* for this action, for each row it retrieve, another *Topics* on model *testing* will run using the constraint that *id* in *testing* should take the value in the original row.
-
-
-#### 3.3.4) Select one row, *Edit*
-
-```
-err = crud.EditHash()
-```
-Here you select by its primary key value (the timestamp), which is assumed to be in *ARGS*. The returned data is in *model.LISTS*. Optionally, you may put a restriction. 
-
-
-#### 3.3.5) Sort order, *OrderString*
-
-This returns you the sort string used in the *select many*. If you inherit this class you can override this function to use your own sorting logic.
-
-
-## SAMPLES
-
-Please check those test files:
-
-- DBI: [dbi_test.go](https://github.com/genelet/taodbi/blob/master/dbi_test.go)
-- Crud: [crud_test.go](https://github.com/genelet/taodbi/blob/master/crud_test.go)
-- Model: [model_test.go](https://github.com/genelet/taodbi/blob/master/model_test.go)
-
-
-
-
-
-
-
+<br /><br />
 
 
