@@ -26,9 +26,9 @@ The names of arguments passed in functions or methods in this package are define
 Name | Type | IN/OUT | Where | Meaning
 ---- | ---- | ------ | ----- | -------
 *args* | `...interface{}` | IN | `DBI` | single-valued interface slice, possibly empty
-*args* | `url.Values` | IN | `Model` | via SetArgs() to set input data
-*args* | `url.Values` | IN | `Schema` | input data passing to Run()
-*extra* | `url.Values` | IN | `Model`,`Schema` | WHERE constraints; single value - EQUAL,  multi value - IN
+*args* | `map[string]interface{}` | IN | `Model` | via SetArgs() to set input data
+*args* | `map[string]interface{}` | IN | `Schema` | input data passing to Run()
+*extra* | `map[string]interface{}` | IN | `Model`,`Schema` | WHERE constraints; single value - EQUAL,  multi value - IN
 *lists* | `[]map[string]interface{}` | OUT | all | output as slice of rows; each row is a map.
 *res* | `map[string]interface{}` | OUT | `DBI` | output for one row
 
@@ -227,10 +227,10 @@ which is similar to `SelectSQLLabel` but has only single output to `res`.
 #### 1.4.2) `GetArgs`
 
 ```go
-func (*DBI) GetArgs(res url.Values, query string, args ...interface{}) error
+func (*DBI) GetArgs(res map[string]interface{}, query string, args ...interface{}) error
 ```
 
-which is similar to `SelectSQL` but has only single output to `res` which uses type [url.Values](https://golang.org/pkg/net/url/). This function will be used mainly in web applications, where HTTP request data are expressed in `url.Values`.
+which is similar to `SelectSQL` but has only single output to `res` which uses type *map[string]interface{}*. This function will be used mainly in web applications, where HTTP request data are expressed in `map[string]interface{}`.
 
 <br /><br />
 
@@ -423,9 +423,9 @@ All *Model*, "Rmodel* and *Smodel* are implementations of interface *Navigate*.
 
 ```go
 type Navigate interface {
-    SetArgs(url.Values)                            // set http request data
+    SetArgs(map[string]interface{})                            // set http request data
     SetDB(*sql.DB)                                 // set the database handle
-    GetAction(string)   func(...url.Values) error  // get function by action name
+    GetAction(string)   func(...map[string]interface{}) error  // get function by action name
     GetLists()          []map[string]interface{}   // get result after an action
 }
 ```
@@ -436,10 +436,10 @@ Use
 
 ```go
 func (*Navigate) SetDB(db *sql.DB)
-func (*Navigate) SetArgs(args url.Values)
+func (*Navigate) SetArgs(args map[string]interface{})
 ```
 
-to set database handle `db`, and input data `args`. The input data is of type *url.Values*.
+to set database handle `db`, and input data `args`. The input data is of type *map[string]interface{}*.
 In web applications, this is *Form* from http request in `net/http`.
 
 
@@ -454,7 +454,7 @@ After we have run an action on the model, we can retrieve data using
 The closure associated with the action name can be get back:
 
 ```go
-(*Model) GetAction(name string) func(...url.Values) error
+(*Model) GetAction(name string) func(...map[string]interface{}) error
 ```
 
 <br /><br />
@@ -467,7 +467,7 @@ type Model struct {
     DBI
     Table
     Navigate                                        // interface has methods to implement
-    Actions   map[string]func(...url.Values) error  // action name to closure map
+    Actions   map[string]func(...map[string]interface{}) error  // action name to closure map
     Updated
 ```
 
@@ -485,7 +485,7 @@ where `filename` is the file name.
 
 #### 2.3.2) Optional Constraints
 
-For all RESTful methods of *Model*, we have option to put a data structure, named `extra` and of type `url.Values`, to constrain the *WHERE* statement. Currently we have supported 3 cases:
+For all RESTful methods of *Model*, we have option to put a data structure, named `extra` and of type `map[string]interface{}`, to constrain the *WHERE* statement. Currently we have supported 3 cases:
 
 <details>
     <summary>Click to show *extra*</summary>
@@ -505,19 +505,19 @@ among multiple keys | AND conditions.
 #### 2.3.3) For Http METHOD: GET (read all)
 
 ```go
-func (*Model) Topics(extra ...url.Values) error
+func (*Model) Topics(extra ...map[string]interface{}) error
 ```
 
 #### 2.3.4) For Http METHOD: GET (read one)
 
 ```go
-func (*Model) Edit(extra ...url.Values) error
+func (*Model) Edit(extra ...map[string]interface{}) error
 ```
 
 #### 2.3.5) For Http METHOD: POST (create)
 
 ```go
-func (*Model) Insert(extra ...url.Values) error
+func (*Model) Insert(extra ...map[string]interface{}) error
 ```
 
 It inserts a new row using the input data. If `extra` is passed in, it will override the input data.
@@ -534,7 +534,6 @@ package main
 import (
     "log"
     "os"
-    "net/url"
     "database/sql"
     "github.com/genelet/godbi"
     _ "github.com/go-sql-driver/mysql"
@@ -562,7 +561,7 @@ func main() {
     db.Exec(`DROP TABLE IF EXISTS testing`)
     db.Exec(`CREATE TABLE testing (id int auto_increment, x varchar(255), y varchar(255), primary key (id))`)
 
-    args := make(url.Values)
+    args := make(map[string]interface{})
     model.SetDB(db)
     model.SetArgs(args)
 
@@ -637,19 +636,19 @@ where `filename` is the file name.
 #### 2.4.3) For Http METHOD: GET (read all)
 
 ```go
-func (*Model) Topics(extra ...url.Values) error
+func (*Model) Topics(extra ...map[string]interface{}) error
 ```
 
 #### 2.4.4) For Http METHOD: GET (read one)
 
 ```go
-func (*Model) Edit(extra ...url.Values) error
+func (*Model) Edit(extra ...map[string]interface{}) error
 ```
 
 #### 2.4.5) For Http METHOD: POST (create)
 
 ```go
-func (*Model) Insert(extra ...url.Values) error
+func (*Model) Insert(extra ...map[string]interface{}) error
 ```
 
 It inserts a new row using the input data. If `extra` is passed in, it will override the input data.
@@ -657,7 +656,7 @@ It inserts a new row using the input data. If `extra` is passed in, it will over
 #### 2.4.6) Http METHOD: PUT (update)
 
 ```go
-func (*Model) Update(extra ...url.Values) error
+func (*Model) Update(extra ...map[string]interface{}) error
 ```
 
 It updates a row using the input data, constrained by `extra`.
@@ -665,7 +664,7 @@ It updates a row using the input data, constrained by `extra`.
 #### 2.4.7) Http METHOD: PATCH (insupd)
 
 ```go
-func (*Model) Insupd(extra ...url.Values) error
+func (*Model) Insupd(extra ...map[string]interface{}) error
 ```
 
 It inserts or updates a row using the input data, constrained optionally by `extra`.
@@ -673,7 +672,7 @@ It inserts or updates a row using the input data, constrained optionally by `ext
 #### 2.4.8) Http METHOD: DELETE
 
 ```go
-func (*Model) Delete(extra ...url.Values) error
+func (*Model) Delete(extra ...map[string]interface{}) error
 ```
 
 It rows constrained by `extra`. For this function, the input data will NOT be used.
@@ -690,7 +689,6 @@ package main
 import (
     "log"
     "os"
-    "net/url"
     "database/sql"
     "github.com/genelet/godbi"
     _ "github.com/go-sql-driver/mysql"
@@ -718,7 +716,7 @@ func main() {
     db.Exec(`DROP TABLE IF EXISTS testing`)
     db.Exec(`CREATE TABLE testing (id int auto_increment, x varchar(255), y varchar(255), primary key (id))`)
 
-    args := make(url.Values)
+    args := make(map[string]interface{})
     model.SetDB(db)
     model.SetArgs(args)
 

@@ -41,7 +41,6 @@ type Model struct {
 	Navigate
 	Updated bool
 
-	InsupdPars []string `json:"insupd_pars"`
 	// Actions: map between name and action functions
 	Actions map[string]func(...map[string]interface{}) error  `json:"-"`
 	// aARGS: the input data received by the web request

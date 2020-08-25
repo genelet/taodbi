@@ -44,6 +44,8 @@ type Table struct {
 	// Table columns for Crud
 	// InsertPars: the columns used for Create
 	InsertPars []string `json:"insert_pars,omitempty"`
+	// InsupdPars: unique columns
+	InsupdPars []string `json:"insupd_pars"`
 	// EditPar: the columns used for Read One
 	EditPars []interface{} `json:"edit_pars,omitempty"`
 	// EditHash: the columns used for Read One
