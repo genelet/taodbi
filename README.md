@@ -238,7 +238,7 @@ which is similar to `SelectSQL` but has only single output to `res` which uses t
 
 ### 1.5) Function *Quote*
 
-This static function escape a string for unsafe characters *[';]*. You don't need to call it in the above *ExecSQL* and *QuerySQL* because we already do it.
+This static function escape a string for unsafe characters *[';]*. You don't need to call it in the above *DoSQL* and *SelectSQL* because we already do it.
 
 <br /><br />
 
@@ -267,7 +267,7 @@ DELETE      | webHandler | D | Delete | rmodel
 </p>
 </details>
 
-As a time series big data system, *TDengine* does not implement *Update* nor *Delete* verbs. This package simulates them in *R-Model*. Therefore, we have
+As a time series big data system, *TDengine* does not implement *Update* nor *Delete* verbs. This package simulates them in *R-Model*. In this package, we have
 three types of *Model*:
 - *Model*, operating on TDengine tables with only *R* and *C* verbs
 - *Rmodel*, operating on simulated TDengine tables with full *CRUD* verbs
@@ -323,7 +323,9 @@ ForeignKey | foreign_key | optional, a foreign-like column, explained below
 InsertPars     | insert_pars | columns to insert in C
 InsupdPars     | insupd_pars | unique columns in PATCH
 EditPars       | edit_pars | columns to query in R (one)
+EditHash       | edit_hash | override EditPars using assigned column names
 TopicsPars     | topics_pars | columns to query in R (all)
+TopicsHash     | topics_hash | override TopicsPars using assigned column names
 TotalForce     | total_force | if to calculate total counts in R (all)
 
 </p>
@@ -364,7 +366,7 @@ Value | Meaning
 <-1  | use ABS(TotalForce) as the total count
 -1   | always calculate the total count
 0    | don't calculate the total count
-&gt; 0  | calculate only if the total count is not passed in `args`
+&gt; 0  | calculate only if the total count is not given in `args`
 
 </p>
 </details>
