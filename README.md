@@ -71,15 +71,17 @@ package main
 import (
     "log"
     "os"
+    "database/sql"
     "github.com/genelet/taodbi"
+    _ "github.com/taosdata/driver-go/taosSql"
 )
 
 func main() {
-    db, err := taodbi.Open("root:taosdata@/tcp(127.0.0.1:0)/");
+    db, err := sql.Open("taosSql", "root:taosdata@/tcp(127.0.0.1:0)/")
     if err != nil { panic(err) }
     defer db.Close()
 
-    dbi := &taodbi.DBI{Db: db}
+    dbi := &taodbi.DBI{DB: db}
 
     err = dbi.DoSQL(`CREATE DATABASE IF NOT EXISTS mydbi precision "us"`)
     if err != nil { panic(err) }
