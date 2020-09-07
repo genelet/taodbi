@@ -1,6 +1,7 @@
 package taodbi
 
 import (
+	"strconv"
 	"strings"
 )
 
@@ -58,10 +59,20 @@ func (self *Model) insertHash(args map[string]interface{}) error {
     if err := self.DoSQL(sql, values...); err != nil {
 		return err
 	}
+/*
 	id := int64(0)
     if err := self.DB.QueryRow("SELECT LAST(" + self.CurrentKey + ") FROM " + self.CurrentTable).Scan(&id); err != nil {
         return err
     }
+*/
+	str := ""
+    if err := self.DB.QueryRow("SELECT LAST(" + self.CurrentKey + ") FROM " + self.CurrentTable).Scan(&str); err != nil {
+        return err
+    }
+	id, err := strconv.ParseInt(str, 10, 64)
+	if err != nil {
+		return err
+	}
     self.LastID = id
 
 	return nil

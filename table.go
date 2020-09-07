@@ -133,7 +133,6 @@ func generalHashPars(TopicsHash map[string]interface{}, TopicsPars []interface{}
 
 func (parsed *Table) fulfill() {
 	parsed.topicsHashPars = generalHashPars(parsed.TopicsHash, parsed.TopicsPars, nil)
-	parsed.topicsHashPars = generalHashPars(parsed.TopicsHash, parsed.TopicsPars, nil)
 	parsed.editHashPars = generalHashPars(parsed.EditHash, parsed.EditPars, nil)
 
 	if parsed.Sortby == "" {

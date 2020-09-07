@@ -206,7 +206,7 @@ func (self *Rmodel) editRest(lists *[]map[string]interface{}, editPars interface
 	return p.editHashFK(lists, editPars, ids, extra...)
 }
 
-func (self *Rmodel) getPlainLists(passid interface{}, rowcount int, reverse bool) ([]interface{}, error) {
+func (self *Rmodel) getMainExtra(passid interface{}, rowcount int, reverse bool, extra ...map[string]interface{}) (string, map[string]interface{}) {
 	gsql := self.CurrentKey
 	order := "ORDER BY " + self.CurrentKey
 	if reverse {
@@ -217,16 +217,94 @@ func (self *Rmodel) getPlainLists(passid interface{}, rowcount int, reverse bool
 	}
 	gsql += fmt.Sprintf("%d", passid)
 	order += " LIMIT " + fmt.Sprintf("%d", rowcount)
-	lists := make([]map[string]interface{}, 0)
-	if err := self.topicsHash(&lists, self.CurrentKey, order, map[string]interface{}{"_gsql": gsql}); err != nil {
-		return nil, err
+	var c map[string]interface{}
+	if hasValue(extra) {
+		c = extra[0]
+	} else {
+		c = make(map[string]interface{})
 	}
-	ids := make([]interface{}, 0)
-	for _, item := range lists {
-		ids = append(ids, item[self.CurrentKey])
+	c["_gsql"] = gsql
+	return order, c
+}
+
+// simpleRest selects rows by pages
+// lists: received the query results in slice of maps.
+// extra: optional, extra constraints on WHERE of the main table ONLY.
+// topicsPars: defining which and how columns are returned:
+// 1) []string{name} - name of column
+// 2) [2]string{name, type} - name and data type of column
+// 3) map[string]string{name: label} - column name is mapped to label
+// 4) map[string][2]string{name: label, type} -- column name to label and data type
+//
+func (self *Rmodel) simpleRest(rowcount int, reverse bool, passid interface{}, lists *[]map[string]interface{}, selectPars interface{}, extra ...map[string]interface{}) error {
+	if rowcount < 1 {
+		return errors.New("no row counts")
+	}
+	countTable := 0
+	if err := self.totalHash(&countTable, extra...); err != nil {
+		return err
 	}
 
-	return ids, nil
+	// if selectPars are in the main table only
+	// if so, we don't need the profile table
+	simple := self.conditionMainPars(selectPars)
+
+	ignore := passid
+	count := 0
+	total := 0
+	for {
+		tmp := make([]map[string]interface{}, 0)
+		order, c := self.getMainExtra(ignore, rowcount, reverse, extra...)
+		var err error
+		if simple {
+			err = self.topicsHash(&tmp, selectPars, order, c)
+		} else {
+			err = self.topicsHash(&tmp, self.CurrentKey, order, c)
+		}
+		if err != nil {
+			return err
+		}
+		nMain := len(tmp)
+		if nMain == 0 {
+			return nil
+		} // no record left in main
+		ids := make([]interface{}, 0)
+		for _, item := range tmp {
+			id := item[self.CurrentKey]
+			if status, err := self.getStatus(id); err != nil {
+				return err
+			} else if status {
+				if simple {
+					*lists = append(*lists, item)
+				} else {
+					ids = append(ids, id)
+				}
+			}
+			ignore = id
+			total++
+			if total >= rowcount { // rowcount of records found
+				break
+			}
+		}
+
+		if !simple {
+			p := self.ProfileTable
+			items := make([]map[string]interface{}, 0)
+			if err := p.editHashFK(&items, selectPars, ids); err != nil {
+				return err
+			}
+			for _, item := range items {
+				*lists = append(*lists, item)
+			}
+		}
+
+		count += nMain
+		if count >= countTable {
+			return nil
+		}
+	}
+
+	return nil
 }
 
 // topicsRest selects rows by pages
@@ -251,32 +329,30 @@ func (self *Rmodel) topicsRest(rowcount int, reverse bool, passid interface{}, l
 	count := 0
 	total := 0
 	for {
-		ids, err := self.getPlainLists(ignore, rowcount, reverse)
-		if err != nil {
+		tmp := make([]map[string]interface{}, 0)
+		order, c := self.getMainExtra(ignore, rowcount, reverse)
+		if err := self.topicsHash(&tmp, self.CurrentKey, order, c); err != nil {
 			return err
 		}
-		nMain := len(ids)
-		if nMain == 0 {
-			return nil
-		} // no record left in main
-		count += nMain
-		ignore = ids[nMain-1]
-
-		outs := make([]interface{}, 0)
-		for _, id := range ids {
+		ids := make([]interface{}, 0)
+		for _, item := range tmp {
+			id := item[self.CurrentKey]
 			if status, err := self.getStatus(id); err != nil {
 				return err
 			} else if status {
-				outs = append(outs, id)
+				ids = append(ids, id)
 			}
+			ignore = id
 		}
-		if len(outs) < 1 {
-			continue
-		}
+
+		nMain := len(tmp)
+		if nMain < 1 {
+			return nil
+		} // no record left in main
 
 		p := self.ProfileTable
 		items := make([]map[string]interface{}, 0)
-		if err := p.editHashFK(&items, selectPars, outs, extra...); err != nil {
+		if err := p.editHashFK(&items, selectPars, ids, extra...); err != nil {
 			return err
 		}
 		for _, item := range items {
@@ -350,6 +426,29 @@ func (self *Rmodel) totalRest(start, end, v, n *int64) error {
 	return nil
 }
 
+func (self *Rmodel) conditionMainPars(hashPars interface{}) bool {
+	_, asks, _ := selectType(hashPars)
+	_, topics, _ := selectType(self.topicsHashPars)
+	for _, item := range asks {
+		if !grep(topics, item) {
+			return false
+		}
+	}
+	return true
+}
+
+func (self *Rmodel) conditionMainTable(extra ...map[string]interface{}) bool {
+	if !hasValue(extra) {
+		return true
+	}
+	for k := range extra[0] {
+		if !grep(self.InsertPars, k) {
+			return false
+		}
+	}
+	return true
+}
+
 // Topics selects many rows, optionally with restriction defined in 'extra'.
 //
 func (self *Rmodel) Topics(extra ...map[string]interface{}) error {
@@ -377,6 +476,10 @@ func (self *Rmodel) Topics(extra ...map[string]interface{}) error {
 	}
 
 	self.aLISTS = make([]map[string]interface{}, 0)
+	if self.conditionMainTable(extra...) {
+		// extra only conditions for the main table
+		return self.simpleRest(rowcount, reverse, passid, &self.aLISTS, hashPars, extra...)
+	}
 	return self.topicsRest(rowcount, reverse, passid, &self.aLISTS, hashPars, extra...)
 }
 
