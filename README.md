@@ -3,12 +3,14 @@ An abstract interface class to access the big data system TDengine in GO. Check 
 
 [![GoDoc](https://godoc.org/github.com/genelet/taodbi?status.svg)](https://godoc.org/github.com/genelet/taodbi)
 
-[TDengine](https://github.com/taosdata/TDengine) is a very fast open-source database system. It comes with a [GO connector](https://github.com/taosdata/driver-go). This _taodbi_ GO package provides a set of *abstract* classes to access it, and to simulate *Update* and *Delete* verbs as in relational database system. 
+[TDengine](https://github.com/taosdata/TDengine) is a very fast open-source database system. It comes with a [GO connector](https://github.com/taosdata/driver-go). This _taodbi_ GO package provides a set of *abstract* classes to access it. It also simulates
+*Update* and *Delete* verbs as in relational database system. 
 
 There are three levels of usages:
 
 - _Basic_: operating on raw SQL statements and stored procedures.
-- _Model_: operating on specific table and fulfilling CRUD actions, as *Model* in MVC pattern.
+- _Model_: operating on a table and fulfilling CRUD actions
+  - *Model*, normal TDengine table supporting *Read* and *Create* only
   - *R-Model*: simulating full CRUD or RESTful actions
   - *S-Model*: operating on *TDengine*'s own *S-Table* 
 - _Schema_: operating on whole database schema and fulfilling RESTful and GraphQL actions.
