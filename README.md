@@ -12,7 +12,7 @@ There are three levels of usages:
 - _Model_: operating on a table and fulfilling CRUD actions
   - *Model*: normal TDengine table supporting *Read* and *Create* only
   - *R-Model*: simulating full CRUD or RESTful actions
-  - *S-Model*: operating on *TDengine*'s *S-Table* 
+  - *S-Model*: operating on TDengine's *S-Table* 
 - _Schema_: operating on whole database schema and fulfilling RESTful and GraphQL actions.
 
 
