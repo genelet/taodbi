@@ -3,14 +3,16 @@ An abstract interface class to access the big data system TDengine in GO. Check 
 
 [![GoDoc](https://godoc.org/github.com/genelet/taodbi?status.svg)](https://godoc.org/github.com/genelet/taodbi)
 
-[TDengine](https://github.com/taosdata/TDengine) is a very fast open-source database system. It comes with a [GO connector](https://github.com/taosdata/driver-go). This _taodbi_ GO package provides a set of *abstract* classes to access it, and to simulate *Update* and *Delete* verbs as in relational database system. 
+[TDengine](https://github.com/taosdata/TDengine) is a very fast open-source database system. It comes with a [GO connector](https://github.com/taosdata/driver-go). This _taodbi_ GO package provides a set of *abstract* classes to access it. It also simulates
+*Update* and *Delete* verbs as in relational database system. 
 
 There are three levels of usages:
 
 - _Basic_: operating on raw SQL statements and stored procedures.
-- _Model_: operating on specific table and fulfilling CRUD actions, as *Model* in MVC pattern.
+- _Model_: operating on a table and fulfilling CRUD actions
+  - *Model*: normal TDengine table supporting *Read* and *Create* only
   - *R-Model*: simulating full CRUD or RESTful actions
-  - *S-Model*: operating on *TDengine*'s own *S-Table* 
+  - *S-Model*: operating on TDengine's *S-Table* 
 - _Schema_: operating on whole database schema and fulfilling RESTful and GraphQL actions.
 
 
@@ -71,15 +73,17 @@ package main
 import (
     "log"
     "os"
+    "database/sql"
     "github.com/genelet/taodbi"
+    _ "github.com/taosdata/driver-go/taosSql"
 )
 
 func main() {
-    db, err := taodbi.Open("root:taosdata@/tcp(127.0.0.1:0)/");
+    db, err := sql.Open("taosSql", "root:taosdata@/tcp(127.0.0.1:0)/")
     if err != nil { panic(err) }
     defer db.Close()
 
-    dbi := &taodbi.DBI{Db: db}
+    dbi := &taodbi.DBI{DB: db}
 
     err = dbi.DoSQL(`CREATE DATABASE IF NOT EXISTS mydbi precision "us"`)
     if err != nil { panic(err) }
@@ -236,7 +240,7 @@ which is similar to `SelectSQL` but has only single output to `res` which uses t
 
 ### 1.5) Function *Quote*
 
-This static function escape a string for unsafe characters *[';]*. You don't need to call it in the above *ExecSQL* and *QuerySQL* because we already do it.
+This static function escape a string for unsafe characters *[';]*. You don't need to call it in the above *DoSQL* and *SelectSQL* because we already do it.
 
 <br /><br />
 
@@ -265,7 +269,7 @@ DELETE      | webHandler | D | Delete | rmodel
 </p>
 </details>
 
-As a time series big data system, *TDengine* does not implement *Update* nor *Delete* verbs. This package simulates them in *R-Model*. Therefore, we have
+As a time series big data system, *TDengine* does not implement *Update* nor *Delete* verbs. This package simulates them in *R-Model*. In this package, we have
 three types of *Model*:
 - *Model*, operating on TDengine tables with only *R* and *C* verbs
 - *Rmodel*, operating on simulated TDengine tables with full *CRUD* verbs
@@ -321,7 +325,9 @@ ForeignKey | foreign_key | optional, a foreign-like column, explained below
 InsertPars     | insert_pars | columns to insert in C
 InsupdPars     | insupd_pars | unique columns in PATCH
 EditPars       | edit_pars | columns to query in R (one)
+EditHash       | edit_hash | override EditPars using assigned column names
 TopicsPars     | topics_pars | columns to query in R (all)
+TopicsHash     | topics_hash | override TopicsPars using assigned column names
 TotalForce     | total_force | if to calculate total counts in R (all)
 
 </p>
@@ -362,7 +368,7 @@ Value | Meaning
 <-1  | use ABS(TotalForce) as the total count
 -1   | always calculate the total count
 0    | don't calculate the total count
-&gt; 0  | calculate only if the total count is not passed in `args`
+&gt; 0  | calculate only if the total count is not given in `args`
 
 </p>
 </details>
